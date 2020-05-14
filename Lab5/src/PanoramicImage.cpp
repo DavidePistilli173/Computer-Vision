@@ -61,6 +61,11 @@ bool PanoramicImage::computeMatches(float ratio)
             }
         }
         Log::info("Removed %d matches.", count);
+        if (matches_[prev].empty())
+        {
+            Log::error("No matches remaining.");
+            return false;
+        }
 
         /* Check outliers. */
         Log::info("Computing homography matrix.");
@@ -90,7 +95,7 @@ bool PanoramicImage::computeMatches(float ratio)
         /* Handle bad matches. */
         if (count == 0)
         {
-            Log::error("No matches found. Forcing translation to image size.");
+            Log::error("No inliers found. Forcing translation to image size.");
             translation.x = cilProj_[prev].cols;
             translation.y = cilProj_[prev].rows;
         }
@@ -192,12 +197,26 @@ bool PanoramicImage::loadImages(std::string_view folder)
 
     imgs_.clear();
     /* Load image files. */
-    for (const auto& fileName : fileNames)
+    Log::info("Loading image %s.", fileNames[0].c_str());
+    if (imgs_.emplace_back(cv::imread(fileNames[0])).empty())
     {
-        Log::info("Loading image %s.", fileName.c_str());
-        if (imgs_.emplace_back(cv::imread(fileName)).empty())
+        Log::error("FAILED");
+        return false;
+    }
+
+    int rows{ imgs_[0].rows };
+    int cols{ imgs_[0].cols };
+    for (int i = 1; i < fileNames.size(); ++i)
+    {
+        Log::info("Loading image %s.", fileNames[i].c_str());
+        if (imgs_.emplace_back(cv::imread(fileNames[i])).empty())
         {
-            Log::error("FAILED");
+            Log::error("Loading failed.");
+            return false;
+        }
+        if (imgs_[i].rows != rows || imgs_[i].cols != cols)
+        {
+            Log::error("The image does not have the same resolution as the others.");
             return false;
         }
     }
