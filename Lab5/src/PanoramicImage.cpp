@@ -97,11 +97,10 @@ bool PanoramicImage::computeMatches(float ratio)
         else
         {
             translation /= count;
-            if (translation.x < 0 || translation.y < 0)
+            if (translation.x < 0)
             {
-                Log::warn("Negative translation value.");
-                //if (translation.x < 0) translation.x = cilProj_[prev].cols;
-                //if (translation.y < 0) translation.y = cilProj_[prev].rows;
+                Log::warn("Negative translation value. Forcing translation to image size.");
+                if (translation.x < 0) translation.x = cilProj_[prev].cols;
             }
         }
         Log::info("Number of inliers: %d/%d.", count, dstPts.size());
@@ -123,25 +122,32 @@ cv::Mat PanoramicImage::computePanorama() const
 {
     /* Compute final image size. */
     int width{ 0 };
-    int height{ cilProj_[0].rows };
+    int above{ 0 };
+    int below{ 0 };
     for (int i = 1; i < cilProj_.size(); ++i)
     {
-        int prev = i - 1;
-        if (translations_[prev].x > 0) width += translations_[prev].x;
+        auto [transX, transY] = translations_[i - 1];
+        if (transX > 0) width += transX;
+        if (transY > 0 && below < transY) below = transY;
+        else if (above < -transY) above = -transY;
     }
     width += cilProj_[cilProj_.size() - 1].cols;
+    int height{ above + cilProj_[0].rows + below };
 
     /* Initialise the result image. */
     cv::Mat result{ cv::Mat::zeros(height, width, cilProj_[0].type()) };
 
     /* Copy all images to the output. */
-    cilProj_[0].copyTo(result(cv::Range{ 0, cilProj_[0].rows }, cv::Range{ 0, cilProj_[0].cols }));
+    cilProj_[0].copyTo(result(cv::Range{ above, cilProj_[0].rows + above }, cv::Range{ 0, cilProj_[0].cols }));
     int x{ 0 };
     for (int i = 1; i < cilProj_.size(); ++i)
     {
-        int prev = i - 1;
-        x += translations_[prev].x ;
-        cilProj_[i].copyTo(result(cv::Range{ 0, cilProj_[i].rows }, cv::Range{ x, x + cilProj_[i].cols }));
+        auto [transX, transY] = translations_[i - 1];
+        x += transX;
+        cilProj_[i].copyTo(result(
+            cv::Range{ above + transY, cilProj_[i].rows + above + transY }, 
+            cv::Range{ x, x + cilProj_[i].cols }
+        ));
     }
 
     return result;
