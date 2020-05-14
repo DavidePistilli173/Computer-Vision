@@ -1,0 +1,37 @@
+[
+{
+  "directory": "/mnt/c/Users/david/OneDrive/UniPD/Anno_5_Semestre_2/Computer_Vision/HW/Lab4/build",
+  "command": "/usr/bin/c++   -I/mnt/c/Users/david/OneDrive/UniPD/Anno_5_Semestre_2/Computer_Vision/HW/Lab4/include -isystem /usr/local/include/opencv4    -Wall -Wextra -Wpedantic -std=gnu++1z -o CMakeFiles/Lab4.dir/src/lab4_main.cpp.o -c /mnt/c/Users/david/OneDrive/UniPD/Anno_5_Semestre_2/Computer_Vision/HW/Lab4/src/lab4_main.cpp",
+  "file": "/mnt/c/Users/david/OneDrive/UniPD/Anno_5_Semestre_2/Computer_Vision/HW/Lab4/src/lab4_main.cpp"
+},
+{
+  "directory": "/mnt/c/Users/david/OneDrive/UniPD/Anno_5_Semestre_2/Computer_Vision/HW/Lab4/build",
+  "command": "/usr/bin/c++   -I/mnt/c/Users/david/OneDrive/UniPD/Anno_5_Semestre_2/Computer_Vision/HW/Lab4/include -isystem /usr/local/include/opencv4    -Wall -Wextra -Wpedantic -std=gnu++1z -o CMakeFiles/Lab4.dir/src/lab4.cpp.o -c /mnt/c/Users/david/OneDrive/UniPD/Anno_5_Semestre_2/Computer_Vision/HW/Lab4/src/lab4.cpp",
+  "file": "/mnt/c/Users/david/OneDrive/UniPD/Anno_5_Semestre_2/Computer_Vision/HW/Lab4/src/lab4.cpp"
+},
+{
+  "directory": "/mnt/c/Users/david/OneDrive/UniPD/Anno_5_Semestre_2/Computer_Vision/HW/Lab4/build",
+  "command": "/usr/bin/c++   -I/mnt/c/Users/david/OneDrive/UniPD/Anno_5_Semestre_2/Computer_Vision/HW/Lab4/include -isystem /usr/local/include/opencv4    -Wall -Wextra -Wpedantic -std=gnu++1z -o CMakeFiles/Lab4.dir/src/StreetAnaliser.cpp.o -c /mnt/c/Users/david/OneDrive/UniPD/Anno_5_Semestre_2/Computer_Vision/HW/Lab4/src/StreetAnaliser.cpp",
+  "file": "/mnt/c/Users/david/OneDrive/UniPD/Anno_5_Semestre_2/Computer_Vision/HW/Lab4/src/StreetAnaliser.cpp"
+},
+{
+  "directory": "/mnt/c/Users/david/OneDrive/UniPD/Anno_5_Semestre_2/Computer_Vision/HW/Lab4/build",
+  "command": "/usr/bin/c++   -I/mnt/c/Users/david/OneDrive/UniPD/Anno_5_Semestre_2/Computer_Vision/HW/Lab4/include -isystem /usr/local/include/opencv4    -Wall -Wextra -Wpedantic -std=gnu++1z -o CMakeFiles/Lab4.dir/src/Canny.cpp.o -c /mnt/c/Users/david/OneDrive/UniPD/Anno_5_Semestre_2/Computer_Vision/HW/Lab4/src/Canny.cpp",
+  "file": "/mnt/c/Users/david/OneDrive/UniPD/Anno_5_Semestre_2/Computer_Vision/HW/Lab4/src/Canny.cpp"
+},
+{
+  "directory": "/mnt/c/Users/david/OneDrive/UniPD/Anno_5_Semestre_2/Computer_Vision/HW/Lab4/build",
+  "command": "/usr/bin/c++   -I/mnt/c/Users/david/OneDrive/UniPD/Anno_5_Semestre_2/Computer_Vision/HW/Lab4/include -isystem /usr/local/include/opencv4    -Wall -Wextra -Wpedantic -std=gnu++1z -o CMakeFiles/Lab4.dir/src/ImgProcessor.cpp.o -c /mnt/c/Users/david/OneDrive/UniPD/Anno_5_Semestre_2/Computer_Vision/HW/Lab4/src/ImgProcessor.cpp",
+  "file": "/mnt/c/Users/david/OneDrive/UniPD/Anno_5_Semestre_2/Computer_Vision/HW/Lab4/src/ImgProcessor.cpp"
+},
+{
+  "directory": "/mnt/c/Users/david/OneDrive/UniPD/Anno_5_Semestre_2/Computer_Vision/HW/Lab4/build",
+  "command": "/usr/bin/c++   -I/mnt/c/Users/david/OneDrive/UniPD/Anno_5_Semestre_2/Computer_Vision/HW/Lab4/include -isystem /usr/local/include/opencv4    -Wall -Wextra -Wpedantic -std=gnu++1z -o CMakeFiles/Lab4.dir/src/LineHough.cpp.o -c /mnt/c/Users/david/OneDrive/UniPD/Anno_5_Semestre_2/Computer_Vision/HW/Lab4/src/LineHough.cpp",
+  "file": "/mnt/c/Users/david/OneDrive/UniPD/Anno_5_Semestre_2/Computer_Vision/HW/Lab4/src/LineHough.cpp"
+},
+{
+  "directory": "/mnt/c/Users/david/OneDrive/UniPD/Anno_5_Semestre_2/Computer_Vision/HW/Lab4/build",
+  "command": "/usr/bin/c++   -I/mnt/c/Users/david/OneDrive/UniPD/Anno_5_Semestre_2/Computer_Vision/HW/Lab4/include -isystem /usr/local/include/opencv4    -Wall -Wextra -Wpedantic -std=gnu++1z -o CMakeFiles/Lab4.dir/src/CircleHough.cpp.o -c /mnt/c/Users/david/OneDrive/UniPD/Anno_5_Semestre_2/Computer_Vision/HW/Lab4/src/CircleHough.cpp",
+  "file": "/mnt/c/Users/david/OneDrive/UniPD/Anno_5_Semestre_2/Computer_Vision/HW/Lab4/src/CircleHough.cpp"
+}
+]

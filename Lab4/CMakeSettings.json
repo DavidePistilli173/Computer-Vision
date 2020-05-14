@@ -1,0 +1,30 @@
+﻿{
+  "configurations": [
+    {
+      "name": "x64-Debug",
+      "generator": "Ninja",
+      "configurationType": "Debug",
+      "inheritEnvironments": [ "msvc_x64_x64" ],
+      "buildRoot": "${projectDir}\\out\\build\\${name}",
+      "installRoot": "${projectDir}\\out\\install\\${name}",
+      "cmakeCommandArgs": "",
+      "buildCommandArgs": "-v",
+      "ctestCommandArgs": "",
+      "enableClangTidyCodeAnalysis": true,
+      "clangTidyChecks": "*, -google*, -fuchsia*, -modernize-use-trailing-return-type, -llvm-namespace-comment, -hicpp-vararg, -cppcoreguidelines-pro-type-vararg, -misc-non-private-member-variables-in-classes,-cppcoreguidelines-pro-bounds-pointer-arithmetic, -cppcoreguidelines-pro-bounds-constant-array-index, -cppcoreguidelines-non-private-member-variables-in-classes, -hicpp-braces-around-statements, -readability-braces-around-statements",
+      "variables": []
+    },
+    {
+      "name": "x64-Release",
+      "generator": "Ninja",
+      "configurationType": "Release",
+      "buildRoot": "${projectDir}\\out\\build\\${name}",
+      "installRoot": "${projectDir}\\out\\install\\${name}",
+      "cmakeCommandArgs": "",
+      "buildCommandArgs": "-v",
+      "ctestCommandArgs": "",
+      "inheritEnvironments": [ "msvc_x64_x64" ],
+      "variables": []
+    }
+  ]
+}

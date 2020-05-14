@@ -1,0 +1,7 @@
+---
+Checks:            '*, -modernize-use-trailing-return-type, -google-readability-namespace-comments, -llvm-namespace-comment, 
+                    -fuchsia-trailing-return, -hicpp-vararg, -cppcoreguidelines-pro-type-vararg, -fuchsia-default-arguments-calls'
+WarningsAsErrors:  ''
+HeaderFilterRegex: '.*'
+FormatStyle:       'file'
+User:              david
