@@ -21,6 +21,19 @@ namespace lab5
         esc = 27
     };
 
+    /********** STRUCT **********/
+    template <typename T>
+    struct Size
+    {
+        constexpr Size() = default;
+        constexpr Size(const T a, const T b) :
+            w{ a }, h{ b }
+        {}
+
+        T w{};
+        T h{};
+    };
+
     /********** CLASSES **********/
     /* Basic console logging functions. */
     class Log
@@ -41,7 +54,7 @@ namespace lab5
             std::scoped_lock lck(mtx_);
             std::printf("\033[1;37m[INFO] - ");
             std::printf(msg.data(), args...);
-            std::printf("\n");
+            std::printf("\n\033[0m");
         }
         template <typename... Args>
         static void warn(std::string_view msg, Args... args)
@@ -49,7 +62,7 @@ namespace lab5
             std::scoped_lock lck(mtx_);
             std::printf("\033[0;33m[WARN] - ");
             std::printf(msg.data(), args...);
-            std::printf("\n");
+            std::printf("\n\033[0m");
         }
         template <typename... Args>
         static void error(std::string_view msg, Args... args)
@@ -57,7 +70,7 @@ namespace lab5
             std::scoped_lock lck(mtx_);
             std::printf("\033[0;31m[ERROR] - ");
             std::printf(msg.data(), args...);
-            std::printf("\n");
+            std::printf("\n\033[0m");
         }
         template <typename... Args>
         static void fatal(std::string_view msg, Args... args)
@@ -65,7 +78,7 @@ namespace lab5
             std::scoped_lock lck(mtx_);
             std::printf("\033[0;35m[FATAL] - ");
             std::printf(msg.data(), args...);
-            std::printf("\n");
+            std::printf("\n\033[0m");
         }
 
     private:

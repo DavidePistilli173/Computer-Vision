@@ -1,6 +1,5 @@
 #include "PanoramicImage.hpp"
 
-#include "lab5.hpp"
 #include "panoramic_utils.h"
 
 #include <opencv2/calib3d.hpp>
@@ -126,6 +125,7 @@ bool PanoramicImage::computeMatches(float ratio)
 cv::Mat PanoramicImage::computePanorama() const
 {
     /* Compute final image size. */
+    Log::info("Computing final panorama size.");
     int width{ 0 };
     int above{ 0 };
     int below{ 0 };
@@ -138,6 +138,7 @@ cv::Mat PanoramicImage::computePanorama() const
     }
     width += cilProj_[cilProj_.size() - 1].cols;
     int height{ above + cilProj_[0].rows + below };
+    Log::info("Size: (%d,%d).", width, height);
 
     /* Initialise the result image. */
     cv::Mat result{ cv::Mat::zeros(height, width, cilProj_[0].type()) };
@@ -153,6 +154,18 @@ cv::Mat PanoramicImage::computePanorama() const
             cv::Range{ above + transY, cilProj_[i].rows + above + transY }, 
             cv::Range{ x, x + cilProj_[i].cols }
         ));
+
+        /* Blur the transition between images. */
+        cv::Mat transitionArea{ result(
+            cv::Range{ 0, cilProj_[i].rows }, 
+            cv::Range{ x - transition_side, x + transition_side }
+        ) };
+        cv::GaussianBlur(
+            transitionArea,
+            transitionArea,
+            cv::Size{ kernel_size.w, kernel_size.h },
+            gauss_sigma
+        );
     }
 
     return result;

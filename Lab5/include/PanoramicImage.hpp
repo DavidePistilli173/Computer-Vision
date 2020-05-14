@@ -1,6 +1,8 @@
 #ifndef PANORAMICIMAGE_HPP
 #define PANORAMICIMAGE_HPP
 
+#include "lab5.hpp"
+
 #include <opencv2/core.hpp>
 
 #include <string_view>
@@ -14,6 +16,9 @@ namespace lab5
         /********** CONSTANTS **********/
         static constexpr std::string_view file_pattern{ "i*.*" }; // Glob name pattern.
         static constexpr int min_images{ 2 }; // Minimum number of required images.
+        static constexpr int transition_side{ 2 };
+        static constexpr Size kernel_size{ 7, 1 };
+        static constexpr double gauss_sigma{ 2.5 };
 
         /********** CONSTRUCTOR **********/
         PanoramicImage() = default;
