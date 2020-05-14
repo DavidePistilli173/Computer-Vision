@@ -20,29 +20,6 @@ namespace lab5
     {
         esc = 27
     };
-    /* RGB colour components. */
-    enum class RGB
-    {
-        b,
-        g,
-        r,
-        tot
-    };
-    /* HSV colour components. */
-    enum class HSV
-    {
-        h,
-        s,
-        v,
-        tot
-    };
-    /* Image type. */
-    enum class ImgType
-    {
-        bgr,
-        hsv,
-        grey
-    };
 
     /********** CLASSES **********/
     /* Basic console logging functions. */
