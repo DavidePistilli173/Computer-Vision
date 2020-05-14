@@ -12,11 +12,21 @@ using namespace lab5;
 
 bool PanoramicImage::computeMatches(float ratio)
 {
+    /* Input check. */
+    if (descriptors_.empty())
+    {
+        Log::error("No available feature descriptors.");
+        return false;
+    }
+
     Log::info("Creating descriptor matcher.");
     auto bfMatcher = cv::BFMatcher::create(cv::NORM_HAMMING);
     
+    /* Reset output. */
     matches_.clear();
     matches_.resize(descriptors_.size() - 1);
+
+    /* From the second image onwards, compute its matches with the previous one. */
     for (size_t i = 1; i < descriptors_.size(); ++i)
     {
         size_t prev{ i - 1 };
@@ -52,6 +62,7 @@ bool PanoramicImage::computeMatches(float ratio)
         }
         Log::info("Removed %d matches.", count);
 
+        /* Check outliers. */
         Log::info("Computing homography matrix.");
         std::vector<cv::Point2f> srcPts;
         std::vector<cv::Point2f> dstPts;
@@ -76,6 +87,7 @@ bool PanoramicImage::computeMatches(float ratio)
             }
         }
 
+        /* Handle bad matches. */
         if (count == 0)
         {
             Log::error("No matches found. Forcing translation to image size.");
@@ -92,8 +104,8 @@ bool PanoramicImage::computeMatches(float ratio)
                 //if (translation.y < 0) translation.y = cilProj_[prev].rows;
             }
         }
-
         Log::info("Number of inliers: %d/%d.", count, dstPts.size());
+
         translations_.emplace_back(cvRound(translation.x), cvRound(translation.y));
         Log::info(
             "Average translation for images %d and %d is (%d, %d).", 
@@ -107,8 +119,9 @@ bool PanoramicImage::computeMatches(float ratio)
     return true;
 }
 
-cv::Mat PanoramicImage::computePanorama()
+cv::Mat PanoramicImage::computePanorama() const
 {
+    /* Compute final image size. */
     int width{ 0 };
     int height{ cilProj_[0].rows };
     for (int i = 1; i < cilProj_.size(); ++i)
@@ -118,8 +131,10 @@ cv::Mat PanoramicImage::computePanorama()
     }
     width += cilProj_[cilProj_.size() - 1].cols;
 
+    /* Initialise the result image. */
     cv::Mat result{ cv::Mat::zeros(height, width, cilProj_[0].type()) };
 
+    /* Copy all images to the output. */
     cilProj_[0].copyTo(result(cv::Range{ 0, cilProj_[0].rows }, cv::Range{ 0, cilProj_[0].cols }));
     int x{ 0 };
     for (int i = 1; i < cilProj_.size(); ++i)
@@ -132,10 +147,20 @@ cv::Mat PanoramicImage::computePanorama()
     return result;
 }
 
-void PanoramicImage::extractORB()
+bool PanoramicImage::extractORB()
 {
+    /* Input check. */
+    if (cilProj_.empty())
+    {
+        Log::error("No available projected images.");
+        return false;
+    }
+
+    /* Reset output. */
     keypoints_.clear();
     descriptors_.clear();
+
+    /* Compute keypoints and descriptors. */
     Log::info("Creating ORB object.");
     auto orb = cv::ORB::create();
     Log::info("Finding keypoints.");
@@ -153,9 +178,9 @@ bool PanoramicImage::loadImages(std::string_view folder)
         file_pattern.data(),
         fileNames
     );
-    if (fileNames.empty())
+    if (fileNames.size() < min_images)
     {
-        Log::error("No images found in folder %s.", folder.data());
+        Log::error("Not enough images found in folder %s.", folder.data());
         return false;
     }
 
@@ -174,8 +199,15 @@ bool PanoramicImage::loadImages(std::string_view folder)
     return true;
 }
 
-void PanoramicImage::projectImages(int hfov)
+bool PanoramicImage::projectImages(int hfov)
 {
+    /* Input check. */
+    if (imgs_.empty())
+    {
+        Log::error("No available images.");
+        return false;
+    }
+
     /* Compute the cilindrical projection for all images and equalise all histograms. */
     cilProj_.clear();
     for (int i = 0; i < imgs_.size(); ++i)

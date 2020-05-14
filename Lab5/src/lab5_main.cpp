@@ -10,12 +10,13 @@ enum class Argument
     tot
 };
 
-constexpr std::string_view win_name{ "Panorama" };
+constexpr std::string_view win_name{ "Panorama" }; // Name of the output window.
 
 using lab5::Log;
 
 int main(int argc, char* argv[])
 {
+    /* Input argument check. */
     if (argc < static_cast<int>(Argument::tot))
     {
         Log::fatal("Required parameters: <folder name> <camera fov> <ratio>.");
