@@ -73,7 +73,7 @@ bool PanoramicImage::computeMatches(float ratio)
         }
         
         cv::Mat matchMask;
-        cv::Mat H{ cv::findHomography(srcPts, dstPts, matchMask, cv::RANSAC, distTh) };
+        cv::Mat H{ cv::findHomography(srcPts, dstPts, matchMask, cv::RANSAC) };
 
         Log::info("Computing average translation.");
         cv::Point2f translation{ 0.F, 0.F };
