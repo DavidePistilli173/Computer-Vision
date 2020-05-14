@@ -96,7 +96,7 @@ bool PanoramicImage::computeMatches(float ratio)
         {
             Log::error("No inliers found. Forcing translation to image size.");
             translation.x = cilProj_[prev].cols;
-            translation.y = cilProj_[prev].rows;
+            translation.y = 0;
         }
         else
         {
@@ -148,6 +148,7 @@ cv::Mat PanoramicImage::computePanorama() const
     int x{ 0 };
     for (int i = 1; i < cilProj_.size(); ++i)
     {
+        Log::info("Processing image %d.", i);
         auto [transX, transY] = translations_[i - 1];
         x += transX;
         cilProj_[i].copyTo(result(
@@ -168,6 +169,8 @@ cv::Mat PanoramicImage::computePanorama() const
         );
     }
 
+    Log::info("Equalising final histogram.");
+    cv::equalizeHist(result, result);
     return result;
 }
 
