@@ -18,6 +18,7 @@ constexpr std::string_view sift_win_name{ "Panorama SIFT" };
 
 using lab5::Log;
 
+/* Computation parameters. */
 struct Params
 {
     lab5::PanoramicImage::Mode mode;
@@ -26,6 +27,7 @@ struct Params
     double ratio;
 };
 
+/* Compute a panoramic image. */
 void compute(cv::Mat& result, Params params);
 
 int main(int argc, char* argv[])
@@ -42,9 +44,11 @@ int main(int argc, char* argv[])
     int fov{ static_cast<int>(std::atoi(argv[static_cast<int>(Argument::fov)]) / 2.F) };
     double ratio{ std::atof(argv[static_cast<int>(Argument::ratio)]) };
 
+    /* Final images. */
     cv::Mat orbImg;
     cv::Mat siftImg;
 
+    /* Start the computation. */
     std::thread orbTh{ 
         &compute,
         std::ref(orbImg), 
@@ -56,9 +60,11 @@ int main(int argc, char* argv[])
         Params{ lab5::PanoramicImage::Mode::sift, folder, fov, ratio }
     };
 
+    /* Join threads. */
     orbTh.join();
     siftTh.join();
 
+    /* Result check. */
     if (orbImg.empty())
     {
         Log::fatal("Failed to compute the panoramic image with ORB.");
@@ -70,11 +76,11 @@ int main(int argc, char* argv[])
         return -1;
     }
 
-    /* Compute ORB panorama. */
+    /* Show ORB panorama. */
     lab5::Window orbWin{ orb_win_name };
     orbWin.showImg(orbImg);
 
-    /* Compute SIFT panorama. */
+    /* Show SIFT panorama. */
     lab5::Window siftWin{ sift_win_name };
     siftWin.showImg(siftImg);
 

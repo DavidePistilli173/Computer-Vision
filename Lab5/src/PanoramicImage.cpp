@@ -129,9 +129,9 @@ cv::Mat PanoramicImage::computePanorama() const
 {
     /* Compute final image size. */
     Log::info("Computing final panorama size.");
-    int width{ 0 };
-    int above{ 0 };
-    int below{ 0 };
+    int width{ 0 }; // Overall width of the panorama.
+    int above{ 0 }; // Vertical space above the initial image.
+    int below{ 0 }; // Vertical space below the initial image.
     for (int i = 1; i < cilProj_.size(); ++i)
     {
         auto [transX, transY] = translations_[i - 1];
@@ -198,6 +198,7 @@ bool PanoramicImage::extractORB()
     Log::info("Computing descriptors.");
     orb->compute(cilProj_, keypoints_, descriptors_);
 
+    /* Change operating mode. */
     currentMode_ = Mode::orb;
     return true;
 }
@@ -222,6 +223,7 @@ bool PanoramicImage::extractSIFT()
     Log::info("Computing descriptors.");
     sift->compute(cilProj_, keypoints_, descriptors_);
 
+    /* Change operating mode. */
     currentMode_ = Mode::sift;
     return true;
 }
