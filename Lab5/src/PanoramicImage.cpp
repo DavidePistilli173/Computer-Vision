@@ -4,12 +4,13 @@
 
 #include <opencv2/calib3d.hpp>
 #include <opencv2/core/utils/filesystem.hpp>
+#include <opencv2/xfeatures2d.hpp>
 
 #include <algorithm>
 
 using namespace lab5;
 
-bool PanoramicImage::computeMatches(float ratio)
+bool PanoramicImage::computeMatches(double ratio)
 {
     /* Input check. */
     if (descriptors_.empty())
@@ -19,7 +20,9 @@ bool PanoramicImage::computeMatches(float ratio)
     }
 
     Log::info("Creating descriptor matcher.");
-    auto bfMatcher = cv::BFMatcher::create(cv::NORM_HAMMING);
+    int normType{ cv::NORM_HAMMING };
+    if (currentMode_ == Mode::sift) normType = cv::NORM_L2;
+    auto bfMatcher = cv::BFMatcher::create(normType);
     
     /* Reset output. */
     matches_.clear();
@@ -42,7 +45,7 @@ bool PanoramicImage::computeMatches(float ratio)
             )->distance
         };
         Log::info("Minimum distance between matches: %f.", minDist);
-        float distTh{ minDist * ratio };
+        double distTh{ minDist * ratio };
         Log::info("Distance threshold: %f.", distTh);
 
         /* Remove matches that are too distant from each other. */
@@ -194,6 +197,33 @@ bool PanoramicImage::extractORB()
     orb->detect(cilProj_, keypoints_);
     Log::info("Computing descriptors.");
     orb->compute(cilProj_, keypoints_, descriptors_);
+
+    currentMode_ = Mode::orb;
+    return true;
+}
+
+bool PanoramicImage::extractSIFT()
+{
+    /* Input check. */
+    if (cilProj_.empty())
+    {
+        Log::error("No available projected images.");
+        return false;
+    }
+
+    /* Reset output. */
+    keypoints_.clear();
+    descriptors_.clear();
+
+    Log::info("Creating SIFT object.");
+    auto sift = cv::xfeatures2d::SIFT::create();
+    Log::info("Finding keypoints.");
+    sift->detect(cilProj_, keypoints_);
+    Log::info("Computing descriptors.");
+    sift->compute(cilProj_, keypoints_, descriptors_);
+
+    currentMode_ = Mode::sift;
+    return true;
 }
 
 bool PanoramicImage::loadImages(std::string_view folder)

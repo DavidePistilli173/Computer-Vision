@@ -1,6 +1,8 @@
 #include "lab5.hpp"
 #include "PanoramicImage.hpp"
 
+#include <thread>
+
 /* List of command line arguments. */
 enum class Argument
 {
@@ -10,9 +12,21 @@ enum class Argument
     tot
 };
 
-constexpr std::string_view win_name{ "Panorama" }; // Name of the output window.
+/* Names of the output windows. */
+constexpr std::string_view orb_win_name{ "Panorama ORB" };
+constexpr std::string_view sift_win_name{ "Panorama SIFT" };
 
 using lab5::Log;
+
+struct Params
+{
+    lab5::PanoramicImage::Mode mode;
+    std::string_view folder;
+    int fov;
+    double ratio;
+};
+
+void compute(cv::Mat& result, Params params);
 
 int main(int argc, char* argv[])
 {
@@ -23,35 +37,101 @@ int main(int argc, char* argv[])
         return -1;
     }
 
+    /* Extract command line parameters. */
+    std::string_view folder{ argv[static_cast<int>(Argument::folder)] };
+    int fov{ static_cast<int>(std::atoi(argv[static_cast<int>(Argument::fov)]) / 2.F) };
+    double ratio{ std::atof(argv[static_cast<int>(Argument::ratio)]) };
+
+    cv::Mat orbImg;
+    cv::Mat siftImg;
+
+    std::thread orbTh{ 
+        &compute,
+        std::ref(orbImg), 
+        Params{ lab5::PanoramicImage::Mode::orb, folder, fov, ratio } 
+    };
+    std::thread siftTh{ 
+        &compute, 
+        std::ref(siftImg), 
+        Params{ lab5::PanoramicImage::Mode::sift, folder, fov, ratio }
+    };
+
+    orbTh.join();
+    siftTh.join();
+
+    if (orbImg.empty())
+    {
+        Log::fatal("Failed to compute the panoramic image with ORB.");
+        return -1;
+    }
+    if (siftImg.empty())
+    {
+        Log::fatal("Failed to compute the panoramic image with SIFT.");
+        return -1;
+    }
+
+    /* Compute ORB panorama. */
+    lab5::Window orbWin{ orb_win_name };
+    orbWin.showImg(orbImg);
+
+    /* Compute SIFT panorama. */
+    lab5::Window siftWin{ sift_win_name };
+    siftWin.showImg(siftImg);
+
+    cv::waitKey(0);
+
+    return 0;
+}
+
+void compute(cv::Mat& result, Params params)
+{
     lab5::PanoramicImage panImg;
-    
+
     Log::info("Loading input images.");
-    if (!panImg.loadImages(argv[static_cast<int>(Argument::folder)]))
+    if (!panImg.loadImages(params.folder))
     {
         Log::fatal("Loading failed.");
+        return;
     }
     Log::info("Loading complete.");
 
     Log::info("Performing cylindrical projection.");
-    panImg.projectImages(static_cast<int>(std::atoi(argv[static_cast<int>(Argument::fov)])/2.F));
+    if (!panImg.projectImages(params.fov))
+    {
+        Log::fatal("Projection failed.");
+        return;
+    }
     Log::info("Projection complete.");
 
-    Log::info("Extracting ORB features.");
-    panImg.extractORB();
+    switch (params.mode)
+    {
+    case lab5::PanoramicImage::Mode::orb:
+        Log::info("Extracting ORB features.");
+        if (!panImg.extractORB())
+        {
+            Log::error("Failed to extract features.");
+            return;
+        }
+        break;
+    case lab5::PanoramicImage::Mode::sift:
+        Log::info("Extracting SIFT features.");
+        if (!panImg.extractSIFT())
+        {
+            Log::error("Failed to extract features.");
+            return;
+        }
+        break;
+    }
     Log::info("Feature extraction complete.");
 
     Log::info("Matching keypoint descriptors.");
-    if (!panImg.computeMatches(std::atof(argv[static_cast<int>(Argument::ratio)])))
+    if (!panImg.computeMatches(params.ratio))
     {
         Log::fatal("Failed to compute matches.");
-        return -1;
+        return;
     }
     Log::info("Matching complete.");
 
     Log::info("Computing final panoramic image.");
-    lab5::Window win(win_name);
-    win.showImg(panImg.computePanorama());
-    cv::waitKey(0);
-
-    return 0;
+    result = panImg.computePanorama();
 }

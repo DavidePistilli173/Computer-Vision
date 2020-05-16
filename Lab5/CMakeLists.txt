@@ -18,6 +18,9 @@ else()
     set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O3")
 endif (MSVC)
 
+if (UNIX)
+    find_package(Threads)
+endif (UNIX)
 find_package(OpenCV REQUIRED)
 
 include_directories(
@@ -33,10 +36,19 @@ add_executable(
     
  )
 
-target_link_libraries(
-    ${PROJECT_NAME} 
-    ${OpenCV_LIBS}
-)
+# If on Unix, link to Pthread as well.
+if (WIN32)
+    target_link_libraries(
+        ${PROJECT_NAME} 
+        ${OpenCV_LIBS}
+    )
+elseif (UNIX)
+    target_link_libraries(
+        ${PROJECT_NAME} 
+        ${OpenCV_LIBS}
+        ${CMAKE_THREAD_LIBS_INIT}
+    )
+endif (WIN32)
 
 # Copy program data to the build directory.
 if (WIN32 AND MSVC)
