@@ -23,7 +23,7 @@ bool PanoramicImage::computeMatches(double ratio)
     int normType{ cv::NORM_HAMMING };
     if (currentMode_ == Mode::sift) normType = cv::NORM_L2;
     auto bfMatcher = cv::BFMatcher::create(normType);
-    
+
     /* Reset output. */
     matches_.clear();
     matches_.resize(descriptors_.size() - 1);
@@ -39,9 +39,9 @@ bool PanoramicImage::computeMatches(double ratio)
         float minDist
         {
             std::min_element(
-                matches_[prev].begin(), 
-                matches_[prev].end(), 
-                [](const cv::DMatch& left, const cv::DMatch& right) { return left.distance < right.distance; }
+                matches_[prev].begin(),
+                matches_[prev].end(),
+                [](const auto& left, const auto& right) { return left.distance < right.distance; }
             )->distance
         };
         Log::info("Minimum distance between matches: %f.", minDist);
@@ -78,7 +78,7 @@ bool PanoramicImage::computeMatches(double ratio)
             srcPts.emplace_back(keypoints_[prev][match.queryIdx].pt);
             dstPts.emplace_back(keypoints_[i][match.trainIdx].pt);
         }
-        
+
         cv::Mat matchMask;
         cv::Mat H{ cv::findHomography(srcPts, dstPts, matchMask, cv::RANSAC) };
 
@@ -114,10 +114,10 @@ bool PanoramicImage::computeMatches(double ratio)
 
         translations_.emplace_back(cvRound(translation.x), cvRound(translation.y));
         Log::info(
-            "Average translation for images %d and %d is (%d, %d).", 
-            prev, 
-            i, 
-            translations_[prev].x, 
+            "Average translation for images %d and %d is (%d, %d).",
+            prev,
+            i,
+            translations_[prev].x,
             translations_[prev].y
         );
     }
@@ -129,39 +129,64 @@ cv::Mat PanoramicImage::computePanorama() const
 {
     /* Compute final image size. */
     Log::info("Computing final panorama size.");
-    int width{ 0 }; // Overall width of the panorama.
-    int above{ 0 }; // Vertical space above the initial image.
-    int below{ 0 }; // Vertical space below the initial image.
+    Rect<int> panoramaWin{ 0, 0, 0, cilProj_[0].rows }; // Rectangular bound of the panoramic image.
+    Range<int> currentWin{ 0, cilProj_[0].rows }; // Vertical position of the current image.
+    // Scan all images.
     for (int i = 1; i < cilProj_.size(); ++i)
     {
         auto [transX, transY] = translations_[i - 1];
-        if (transX > 0) width += transX;
-        if (transY > 0 && below < transY) below = transY;
-        else if (above < -transY) above = -transY;
+
+        // Update the width.
+        if (transX > 0) panoramaWin.w += transX;
+
+        // Update the height.
+        currentWin += transY;
+        if (currentWin.p1 < panoramaWin.y)
+        {
+            panoramaWin.h += (panoramaWin.y - currentWin.p1);
+            panoramaWin.y = currentWin.p1;
+        }
+        else if (currentWin.p2 > panoramaWin.y + panoramaWin.h)
+        {
+            panoramaWin.h += currentWin.p2 - panoramaWin.y - panoramaWin.h;
+        }
     }
-    width += cilProj_[cilProj_.size() - 1].cols;
-    int height{ above + cilProj_[0].rows + below };
-    Log::info("Size: (%d,%d).", width, height);
+    panoramaWin.w += cilProj_[cilProj_.size() - 1].cols;
+    Log::info("Size: (%d,%d).", panoramaWin.w, panoramaWin.h);
 
     /* Initialise the result image. */
-    cv::Mat result{ cv::Mat::zeros(height, width, cilProj_[0].type()) };
+    cv::Mat result{ cv::Mat::zeros(panoramaWin.h, panoramaWin.w, cilProj_[0].type()) };
 
     /* Copy all images to the output. */
-    cilProj_[0].copyTo(result(cv::Range{ above, cilProj_[0].rows + above }, cv::Range{ 0, cilProj_[0].cols }));
+    cilProj_[0].copyTo(result(
+        cv::Range
+        {
+            -panoramaWin.y,
+            cilProj_[0].rows - panoramaWin.y
+        },
+        cv::Range
+        {
+            0,
+            cilProj_[0].cols
+        }
+    ));
+
     int x{ 0 };
+    int y{ -panoramaWin.y };
     for (int i = 1; i < cilProj_.size(); ++i)
     {
         Log::info("Processing image %d.", i);
         auto [transX, transY] = translations_[i - 1];
         x += transX;
+        y += transY;
         cilProj_[i].copyTo(result(
-            cv::Range{ above + transY, cilProj_[i].rows + above + transY }, 
+            cv::Range{ y, y + cilProj_[i].rows },
             cv::Range{ x, x + cilProj_[i].cols }
         ));
 
         /* Blur the transition between images. */
         cv::Mat transitionArea{ result(
-            cv::Range{ 0, cilProj_[i].rows }, 
+            cv::Range{ 0, cilProj_[i].rows },
             cv::Range{ x - transition_side, x + transition_side }
         ) };
         cv::GaussianBlur(

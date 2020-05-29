@@ -13,8 +13,8 @@ enum class Argument
 };
 
 /* Names of the output windows. */
-constexpr std::string_view orb_win_name{ "Panorama ORB" };
-constexpr std::string_view sift_win_name{ "Panorama SIFT" };
+constexpr std::string_view orb_win_name{ "ORB panorama" };
+constexpr std::string_view sift_win_name{ "SIFT panorama" };
 
 using lab5::Log;
 
@@ -49,14 +49,14 @@ int main(int argc, char* argv[])
     cv::Mat siftImg;
 
     /* Start the computation. */
-    std::thread orbTh{ 
+    std::thread orbTh{
         &compute,
-        std::ref(orbImg), 
-        Params{ lab5::PanoramicImage::Mode::orb, folder, fov, ratio } 
+        std::ref(orbImg),
+        Params{ lab5::PanoramicImage::Mode::orb, folder, fov, ratio }
     };
-    std::thread siftTh{ 
-        &compute, 
-        std::ref(siftImg), 
+    std::thread siftTh{
+        &compute,
+        std::ref(siftImg),
         Params{ lab5::PanoramicImage::Mode::sift, folder, fov, ratio }
     };
 
@@ -96,7 +96,7 @@ void compute(cv::Mat& result, Params params)
     Log::info("Loading input images.");
     if (!panImg.loadImages(params.folder))
     {
-        Log::fatal("Loading failed.");
+        Log::error("Loading failed.");
         return;
     }
     Log::info("Loading complete.");
@@ -104,7 +104,7 @@ void compute(cv::Mat& result, Params params)
     Log::info("Performing cylindrical projection.");
     if (!panImg.projectImages(params.fov))
     {
-        Log::fatal("Projection failed.");
+        Log::error("Projection failed.");
         return;
     }
     Log::info("Projection complete.");
@@ -133,7 +133,7 @@ void compute(cv::Mat& result, Params params)
     Log::info("Matching keypoint descriptors.");
     if (!panImg.computeMatches(params.ratio))
     {
-        Log::fatal("Failed to compute matches.");
+        Log::error("Failed to compute matches.");
         return;
     }
     Log::info("Matching complete.");

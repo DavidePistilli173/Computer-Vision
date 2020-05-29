@@ -35,6 +35,45 @@ namespace lab5
         T h{};
     };
 
+    template <typename T>
+    struct Range
+    {
+        constexpr Range() = default;
+        constexpr Range(const T a, const T b) :
+            p1{ a }, p2{ b }
+        {}
+
+        Range& operator+=(T val)
+        {
+            p1 += val;
+            p2 += val;
+            return *this;
+        }
+        Range& operator-=(T val)
+        {
+            p1 -= val;
+            p2 -= val;
+            return *this;
+        }
+
+        T p1{};
+        T p2{};
+    };
+
+    template <typename T>
+    struct Rect
+    {
+        constexpr Rect() = default;
+        constexpr Rect(const T px, const T py, const T pw, const T ph) :
+            x{ px }, y{ py }, w{ pw }, h{ ph }
+        {}
+
+        T x{};
+        T y{};
+        T w{};
+        T h{};
+    };
+
     /********** CLASSES **********/
     /* Basic console logging functions. */
     class Log
