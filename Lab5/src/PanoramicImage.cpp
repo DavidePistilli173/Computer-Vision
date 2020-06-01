@@ -10,6 +10,8 @@
 
 using namespace lab5;
 
+const cv::Size PanoramicImage::kernel_size{ 7, 1 };
+
 bool PanoramicImage::computeMatches(double ratio)
 {
     /* Input check. */
@@ -41,7 +43,10 @@ bool PanoramicImage::computeMatches(double ratio)
             std::min_element(
                 matches_[prev].begin(),
                 matches_[prev].end(),
-                [](const auto& left, const auto& right) { return left.distance < right.distance; }
+                [](const auto& left, const auto& right)
+                {
+                    return (left.distance < right.distance) && (left.distance != 0);
+                }
             )->distance
         };
         Log::info("Minimum distance between matches: %f.", minDist);
@@ -192,7 +197,7 @@ cv::Mat PanoramicImage::computePanorama() const
         cv::GaussianBlur(
             transitionArea,
             transitionArea,
-            cv::Size{ kernel_size.w, kernel_size.h },
+            kernel_size,
             gauss_sigma
         );
     }
@@ -316,4 +321,6 @@ bool PanoramicImage::projectImages(int hfov)
         Log::info("Equalising image %d.", i);
         cv::equalizeHist(cilProj_[i], cilProj_[i]);
     }
+
+    return true;
 }
