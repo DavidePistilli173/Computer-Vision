@@ -73,15 +73,54 @@ The actual panoramic image is computed considering both horizontal and vertical 
 No final histogram equalisation was applied, since it only worsened the result.
 
 \section{Results}
-The program was tested on 5 different datasets with both ORB and SIFT features.
+The program was tested on 5 different datasets with both ORB and SIFT features in order to compare their results.
+The best parameters are:\\
 
+\begin{center}
+\begin{tabular}{ |c|c|c| }
+\hline
+Dataset & Ratio & Features \\
+\hline
+\hline
+Dolomites & 2.5 & both \\
+\hline
+Kitchen & 2.5 & both \\
+\hline
+Lab & 6.0 & both \\
+\hline
+Lab automatic & 2.5 & SIFT \\
+\hline
+Lab manual & 2.5 & SIFT \\
+\hline
+\end{tabular}
+\end{center}
 
-%\begin{figure}[h]
-%\begin{center}
-%\includegraphics[width=1\textwidth]{images/canny}
-%\caption{\footnotesize{Canny edge detector.}}
-%\label{img_canny}
-%\end{center}
-%\end{figure}
+While in the Kitchen dataset both ORB and SIFT performed similarly, in all the others SIFT proved to identify better features.
+Both in the Dolomites and in the Lab datasets, in fact, SIFT tolerated larger changes to the ratio than ORB. Furthermore, in the last two datasets ORB did not provide a correct result, irrespective of the chosen ratio.
+Some example outputs are provided below.
+
+\begin{figure}[h]
+\begin{center}
+\includegraphics[width=1\textwidth]{images/dolomites}
+\caption{\footnotesize{in the Dolomites dataset we can see a high vertical translation, which got correctly fixed by both ORB and SIFT.}}
+\label{img_dolomites}
+\end{center}
+\end{figure}
+
+\begin{figure}[h]
+\begin{center}
+\includegraphics[width=1\textwidth]{images/kitchen}
+\caption{\footnotesize{the Kitchen dataset provide an almost perfect result, apart from some illumination differences.}}
+\label{img_kitchen}
+\end{center}
+\end{figure}
+
+\begin{figure}[h]
+\begin{center}
+\includegraphics[width=1\textwidth]{images/lab_19_automatic}
+\caption{\footnotesize{this is an example where ORB is not able to provide good enough features, as highlighted.}}
+\label{img_lab_19_automatic}
+\end{center}
+\end{figure}
 
 \end{document}
