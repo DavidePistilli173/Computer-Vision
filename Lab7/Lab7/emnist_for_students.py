@@ -9,6 +9,10 @@ import numpy as np
 import matplotlib.pyplot as plt
 import scipy.io as sio
 import os
+from keras.losses import categorical_crossentropy, sparse_categorical_crossentropy 
+from keras.layers import Conv2D, Dense, Dropout, Flatten, MaxPooling2D
+from keras.models import Sequential
+from keras.optimizers import Adadelta
 
 from sklearn.metrics import confusion_matrix
 
@@ -211,12 +215,12 @@ def image_with_PDF(images, labels, predictions, num_classes, class_names):
 
     num_rows = 5
     num_cols = 3
-    num_images = num_rows*num_cols
-    plt.figure(figsize=(2*2*num_cols, 2*num_rows))
+    num_images = num_rows * num_cols
+    plt.figure(figsize=(2 * 2 * num_cols, 2 * num_rows))
     for i in range(num_images):
-      plt.subplot(num_rows, 2*num_cols, 2*i+1)
+      plt.subplot(num_rows, 2 * num_cols, 2 * i + 1)
       plot_image(i, predictions, labels, np.squeeze(images), class_names)
-      plt.subplot(num_rows, 2*num_cols, 2*i+2)
+      plt.subplot(num_rows, 2 * num_cols, 2 * i + 2)
       plot_value_array(i, predictions, labels, num_classes)
     plt.show()
 
@@ -260,6 +264,10 @@ def load_dataset(folder):
     return train_images, train_labels, test_images, test_labels
 
 def main():
+    physical_devices = tf.config.experimental.list_physical_devices('GPU')
+    assert len(physical_devices) > 0, "Not enough GPU hardware devices available"
+    config = tf.config.experimental.set_memory_growth(physical_devices[0], True)
+
     # read data (digits and letters)
     img_shape = 28 # size of the MNIST images
     folder = os.path.join(os.getcwd(), 'dataset')
@@ -269,7 +277,10 @@ def main():
     print("- Training-set:\t\t{}".format(train_images.shape[0]))
     print("- Test-set:\t\t{}".format(test_images.shape[0]))
 
+    batch_size = 128
+    epochs = 12
     num_classes = 36
+
     class_names = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9',
                    'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J',
                    'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T',
@@ -283,15 +294,31 @@ def main():
     # Plot images
     plot_images(train_images[:9], train_labels[:9], class_names)
 
+    train_labels = keras.utils.to_categorical(train_labels, num_classes)
+    test_labels = keras.utils.to_categorical(test_labels, num_classes)
+
     # Create Keras model and evaluate its performance
+    model = Sequential()
+    model.add(Conv2D(32, (3,3), activation='relu', input_shape=train_images[0].shape))
+    model.add(Conv2D(64, (3,3), activation='relu'))
+    model.add(MaxPooling2D(pool_size=(2,2)))
+    model.add(Dropout(0.25))
+    model.add(Flatten())
+    model.add(Dense(128, activation='relu'))
+    model.add(Dropout(0.5))
+    model.add(Dense(num_classes, activation='softmax'))
+    model.compile(loss = categorical_crossentropy, optimizer = Adadelta(), metrics = ['acc'])
+    history = model.fit(train_images, train_labels, batch_size=batch_size, epochs=epochs, verbose=1, validation_data=(test_images, test_labels))   
+    score = model.evaluate(test_images, test_labels, verbose = 0)
 
+    print('Test loss: ',score[0])
+    print('Test accuracy: ',score[1])
 
-
-
+    plot_history([('CNN_classifier', history)])
+    print_confusion_matrix(model, test_images, np.argmax(test_labels, axis=1), num_classes, class_names)
+    plot_example_errors(model, test_images, np.argmax(test_labels, axis=1), class_names)
 
     keras.backend.clear_session()
 
 if __name__ == '__main__':
     main()
-
-
