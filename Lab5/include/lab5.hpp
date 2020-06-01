@@ -15,6 +15,13 @@ namespace lab5
     /********** CONSTANTS **********/
     constexpr double pi{ 3.14159265358979 };
 
+#ifdef LAB6_DEBUG_MSGS
+    constexpr bool debug_msgs{ true };
+#else
+    constexpr bool debug_msgs{ false };
+#endif
+
+
     /********** ENUMS **********/
     /* Keycodes. */
     enum class Key
@@ -23,18 +30,7 @@ namespace lab5
     };
 
     /********** STRUCT **********/
-    template <typename T>
-    struct Size
-    {
-        constexpr Size() = default;
-        constexpr Size(const T a, const T b) :
-            w{ a }, h{ b }
-        {}
-
-        T w{};
-        T h{};
-    };
-
+    // Numerical range.
     template <typename T>
     struct Range
     {
@@ -60,6 +56,7 @@ namespace lab5
         T p2{};
     };
 
+    // Rectangle.
     template <typename T>
     struct Rect
     {
@@ -68,8 +65,10 @@ namespace lab5
             x{ px }, y{ py }, w{ pw }, h{ ph }
         {}
 
+        // Position of the top-left vertex.
         T x{};
         T y{};
+        // Size of the rectangle.
         T w{};
         T h{};
     };
@@ -88,11 +87,14 @@ namespace lab5
             "--------------------------------------------------------------------------------";
 
         /********** METHODS **********/
+        /* Standard versions, always active. */
         template <typename... Args>
         static void info(std::string_view msg, Args... args)
         {
             std::scoped_lock lck(mtx_);
-            std::printf("\033[1;37m[INFO - T%d] - ", std::this_thread::get_id());
+            std::stringstream s;
+            s << std::this_thread::get_id();
+            std::printf("\033[1;37m[INFO - T%s] - ", s.str().c_str());
             std::printf(msg.data(), args...);
             std::printf("\n\033[0m");
         }
@@ -100,7 +102,9 @@ namespace lab5
         static void warn(std::string_view msg, Args... args)
         {
             std::scoped_lock lck(mtx_);
-            std::printf("\033[0;33m[WARN - T%d] - ", std::this_thread::get_id());
+            std::stringstream s;
+            s << std::this_thread::get_id();
+            std::printf("\033[0;33m[WARN - T%s] - ", s.str().c_str());
             std::printf(msg.data(), args...);
             std::printf("\n\033[0m");
         }
@@ -108,7 +112,9 @@ namespace lab5
         static void error(std::string_view msg, Args... args)
         {
             std::scoped_lock lck(mtx_);
-            std::printf("\033[0;31m[ERROR - T%d] - ", std::this_thread::get_id());
+            std::stringstream s;
+            s << std::this_thread::get_id();
+            std::printf("\033[0;31m[ERROR - T%s] - ", s.str().c_str());
             std::printf(msg.data(), args...);
             std::printf("\n\033[0m");
         }
@@ -116,11 +122,66 @@ namespace lab5
         static void fatal(std::string_view msg, Args... args)
         {
             std::scoped_lock lck(mtx_);
-            std::printf("\033[0;35m[FATAL - T%d] - ", std::this_thread::get_id());
+            std::stringstream s;
+            s << std::this_thread::get_id();
+            std::printf("\033[0;35m[FATAL - T%s] - ", s.str().c_str());
             std::printf(msg.data(), args...);
             std::printf("\n\033[0m");
         }
 
+        /* Debug versions, only active if debug_msgs is true. */
+        template <typename... Args>
+        static void info_d(std::string_view msg, Args... args)
+        {
+            if constexpr (debug_msgs)
+            {
+                std::scoped_lock lck(mtx_);
+                std::stringstream s;
+                s << std::this_thread::get_id();
+                std::printf("\033[1;37m[DINFO - T%s] - ", s.str().c_str());
+                std::printf(msg.data(), args...);
+                std::printf("\n\033[0m");
+            }
+        }
+        template <typename... Args>
+        static void warn_d(std::string_view msg, Args... args)
+        {
+            if constexpr (debug_msgs)
+            {
+                std::scoped_lock lck(mtx_);
+                std::stringstream s;
+                s << std::this_thread::get_id();
+                std::printf("\033[0;33m[DWARN - T%s] - ", s.str().c_str());
+                std::printf(msg.data(), args...);
+                std::printf("\n\033[0m");
+            }
+        }
+        template <typename... Args>
+        static void error_d(std::string_view msg, Args... args)
+        {
+            if constexpr (debug_msgs)
+            {
+                std::scoped_lock lck(mtx_);
+                std::stringstream s;
+                s << std::this_thread::get_id();
+                std::printf("\033[0;31m[DERROR - T%s] - ", s.str().c_str());
+                std::printf(msg.data(), args...);
+                std::printf("\n\033[0m");
+            }
+        }
+        template <typename... Args>
+        static void fatal_d(std::string_view msg, Args... args)
+        {
+            if constexpr (debug_msgs)
+            {
+                std::scoped_lock lck(mtx_);
+                std::stringstream s;
+                s << std::this_thread::get_id();
+                std::printf("\033[0;35m[DFATAL - T%s] - ", s.str().c_str());
+                std::printf(msg.data(), args...);
+                std::printf("\n\033[0m");
+            }
+        }
     private:
         static std::mutex mtx_;
     };
