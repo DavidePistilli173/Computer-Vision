@@ -23,9 +23,10 @@ namespace lab5
         /********** CONSTANTS **********/
         static constexpr std::string_view file_pattern{ "i*.*" }; // Glob name pattern.
         static constexpr int min_images{ 2 }; // Minimum number of required images.
-        static constexpr int transition_side{ 2 };
-        static constexpr Size kernel_size{ 7, 1 };
-        static constexpr double gauss_sigma{ 2.5 };
+        static constexpr int transition_side{ 2 }; // Size of the transition window between images.
+        static constexpr double gauss_sigma{ 2.5 }; // Sigma of the gaussian filter.
+
+        static const cv::Size kernel_size; // Kernel size of the gaussian filter.
 
         /********** CONSTRUCTOR **********/
         PanoramicImage() = default;
