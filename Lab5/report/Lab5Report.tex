@@ -53,24 +53,24 @@
 \maketitle % Insert the title, author and date
 
 \section{Introduction}
-The purpose of this lab experience is the creation of a panoramic image from a set of consecutive pictures.
+The purpose of this lab experience is to create a panoramic image from a set of consecutive pictures.
 In order to run, the program requires the following command line arguments:
 \begin{itemize}
-\item \textbf{Image folder}: the folder where the source images are stored.
-\item \textbf{Image field of view}: the field of view of the images, it must be the same for all of them.
+\item \textbf{Image folder}: the folder where the source images are stored;
+\item \textbf{Image field of view}: the field of view of the images - it must be the same for all of them;
 \item \textbf{Distance ratio}: larger values allow for higher error margins.
 \end{itemize}
 
 \section{Workflow}
-The first step is to perform a cylindrical projection of all source images. After each projection, the corresponding histograms are equalised on order to improve results.
-After this pre-processing step is performed, the keypoints and descriptors for each image are computed. The algorithm can use either ORB or SIFT features in order to compare the two results.
-Using the features from the previous step, matches are computed between each consecutive pair of images. In order to avoid bad matches, the \textit{distance ratio} parameter is used to remove those based on really different keypoints.
-Furthermore, a homography matrix is computed between the two images. This allows to further improve the quality of the matches by removing all outliers that don't fit the transformation.
+The first step is to perform a cylindrical projection of all source images. After each projection, the corresponding histograms are equalised in order to improve results.
+After this pre-processing step, the keypoints and descriptors for each image are computed. The algorithm can use either ORB or SIFT features to compare the two results.
+Using the features from the previous step, matches are computed between each consecutive pair of images. The \textit{distance ratio} parameter can be used to avoid bad matches, and to remove those based on significantly different keypoints.
+Furthermore, a homography matrix is computed between the two images. This allows to further improve the quality of the matches by removing all outliers that do not fit the transformation.
 At this point the average translation between matches can be computed.
 
 The actual panoramic image is computed considering both horizontal and vertical translations that were computed before. Since the border between images is usually quite visible, a Gaussian blur with a (1, 7) kernel and $\sigma=2.5$ is applied to all transitions.
 
-No final histogram equalisation was applied, since it only worsened the result.
+A final histogram equalisation was applied, since it slightly improved the result.
 
 \section{Results}
 The program was tested on 5 different datasets with both ORB and SIFT features in order to compare their results.
@@ -84,7 +84,7 @@ Dataset & Ratio & Features \\
 \hline
 Dolomites & 2.5 & both \\
 \hline
-Kitchen & 2.5 & both \\
+Kitchen & 3.0 & both \\
 \hline
 Lab & 6.0 & both \\
 \hline
@@ -95,8 +95,8 @@ Lab manual & 2.5 & SIFT \\
 \end{tabular}
 \end{center}
 
-While in the Kitchen dataset both ORB and SIFT performed similarly, in all the others SIFT proved to identify better features.
-Both in the Dolomites and in the Lab datasets, in fact, SIFT tolerated larger changes to the ratio than ORB. Furthermore, in the last two datasets ORB did not provide a correct result, irrespective of the chosen ratio.
+While both ORB and SIFT performed similarly in the Kitchen dataset, in all the others SIFT proved to identify better features.
+Indeed, SIFT tolerated larger changes to the ratio than ORB both in the Dolomites and in the Lab datasets. Furthermore, in the last two datasets ORB did not provide a correct result, irrespective of the chosen ratio.
 Some example outputs are provided below.
 
 \begin{figure}[h]
@@ -110,7 +110,7 @@ Some example outputs are provided below.
 \begin{figure}[h]
 \begin{center}
 \includegraphics[width=1\textwidth]{images/kitchen}
-\caption{\footnotesize{the Kitchen dataset provide an almost perfect result, apart from some illumination differences.}}
+\caption{\footnotesize{the Kitchen dataset provides an almost perfect result, apart from some illumination differences.}}
 \label{img_kitchen}
 \end{center}
 \end{figure}
@@ -118,7 +118,7 @@ Some example outputs are provided below.
 \begin{figure}[h]
 \begin{center}
 \includegraphics[width=1\textwidth]{images/lab_19_automatic}
-\caption{\footnotesize{this is an example where ORB is not able to provide good enough features, as highlighted.}}
+\caption{\footnotesize{this is an example where ORB is unable to provide good quality features, as highlighted.}}
 \label{img_lab_19_automatic}
 \end{center}
 \end{figure}
