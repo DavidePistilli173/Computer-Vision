@@ -78,8 +78,13 @@ namespace prj
       {
          size,       // Filter size, <int>.
          colour_sig, // Colour sigma, <double>.
-         space_sig,  // Space sigma, <double>.
-         tot         // Total number of parameters.
+         space_sig   // Space sigma, <double>.
+      };
+      // Parameters for the Canny edge detector.
+      enum class CannyParam
+      {
+         th1,
+         th2
       };
       // Parameters for the gaussian filter.
       enum class GaussianParam
@@ -103,6 +108,8 @@ namespace prj
       /********** METHODS **********/
       // Apply a bilateral filter to the image.
       void bilateralFilter(int size, double colour_sig, double space_sig);
+      // Apply the Canny edge detector.
+      void canny(double th1, double th2);
       // Quickly display the image. Used for debug purposes.
       void display() const;
       // Equalise the histogram of the image.

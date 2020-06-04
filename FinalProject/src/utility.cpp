@@ -115,6 +115,13 @@ void Image::bilateralFilter(int size, double colour_sig, double space_sig)
    mat_ = result;
 }
 
+void prj::Image::canny(double th1, double th2)
+{
+   cv::Mat result;
+   cv::Canny(mat_, result, th1, th2);
+   mat_ = result;
+}
+
 void Image::display() const
 {
    // The thread ID in the name is required to ensure thread-safe windows.

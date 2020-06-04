@@ -20,8 +20,10 @@ cv::Mat TreeDetector::detect(const cv::Mat& input)
    Log::info("Preprocessing.");
    std::array<param, static_cast<int>(PParam::tot)> pParams{
       13,
-      200.0,
-      100.0
+      250.0,
+      100.0,
+      90.0,
+      120.0
    };
    if (!preProcess_(pParams))
    {
@@ -68,5 +70,12 @@ bool TreeDetector::preProcess_(std::array<param, static_cast<int>(PParam::tot)>&
       std::get<double>(params[static_cast<int>(PParam::bi_space_s)]));
 
    if constexpr (debug) filteredImg.display();
+
+   filteredImg.canny(
+      std::get<double>(params[static_cast<int>(PParam::canny_th1)]),
+      std::get<double>(params[static_cast<int>(PParam::canny_th2)]));
+
+   if constexpr (debug) filteredImg.display();
+
    return true;
 }

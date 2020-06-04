@@ -20,6 +20,8 @@ namespace prj
          bi_size,     // Size of the bilateral filter.
          bi_colour_s, // Colour sigma for the bilateral filter.
          bi_space_s,  // Space sigma for the bilateral filter.
+         canny_th1,   // Threshold 1 for Canny.
+         canny_th2,   // Threshold 2 for Canny.
          tot          // Total number of parameters.
       };
       // Analysis parameters.
