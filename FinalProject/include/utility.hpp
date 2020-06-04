@@ -7,9 +7,14 @@
 #include <opencv2/highgui.hpp>
 #include <string_view>
 #include <thread>
+#include <variant>
 #include <vector>
 
-namespace prj {
+namespace prj
+{
+   /********** TYPEDEFS **********/
+   using param = std::variant<int, float, double>; // Generic parameter of different types.
+
    /********** CONSTANTS **********/
    constexpr double pi{ 3.14159265358979 };
 
@@ -21,14 +26,32 @@ namespace prj {
 
    /********** ENUMS **********/
    // Keycodes.
-   enum class Key { esc = 27 };
+   enum class Key
+   {
+      esc = 27
+   };
+   // HSV colour channels
+   enum class HSV
+   {
+      h, // Hue
+      s, // Saturation
+      v  // Value
+   };
+
+   /********** FUNCTIONS **********/
+   // Quickly display an image. Used for debug purposes.
+   void displayImage(const cv::Mat& img);
+   // Equalise the histogram of an HSV image.
+   bool equaliseImg(cv::Mat& img);
 
    /********** STRUCT **********/
    // Rectangle.
    template<typename T>
-   struct Rect {
+   struct Rect
+   {
       constexpr Rect() = default;
-      constexpr Rect(const T px, const T py, const T pw, const T ph) : x{ px }, y{ py }, w{ pw }, h{ ph } {}
+      constexpr Rect(const T px, const T py, const T pw, const T ph) :
+         x{ px }, y{ py }, w{ pw }, h{ ph } {}
 
       // Position of the top-left vertex.
       T x{};
@@ -39,8 +62,41 @@ namespace prj {
    };
 
    /********** CLASSES **********/
+   class Image
+   {
+   public:
+      /********** ENUMS **********/
+      // Supported colour spaces of the image.
+      enum class ColourSpace
+      {
+         grey, // Greyscale.
+         bgr,
+         hsv
+      };
+
+      /********** CONSTRUCTORS **********/
+      explicit Image(const cv::Mat& mat);
+      Image(const Image& img);
+      Image(Image&&) = default;
+      ~Image()       = default;
+
+      /********** METHODS **********/
+      // Get the current colour space of the image.
+      ColourSpace getColourSpace() const;
+      // Get the stored image.
+      cv::Mat& getImage();
+      // Set the colour space of the image.
+      void setColourSpace(ColourSpace newColSpace);
+
+   private:
+      /********** VARIABLES **********/
+      cv::Mat     mat_;
+      ColourSpace colSpace_{ ColourSpace::grey };
+   };
+
    // Basic console logging functions.
-   class Log {
+   class Log
+   {
    public:
       /********** CONSTANTS **********/
       static constexpr const char* asterisks =
@@ -53,7 +109,8 @@ namespace prj {
       /********** METHODS **********/
       // Standard versions, always active.
       template<typename... Args>
-      static void info(std::string_view msg, Args... args) {
+      static void info(std::string_view msg, Args... args)
+      {
          std::scoped_lock  lck(mtx_);
          std::stringstream s;
          s << std::this_thread::get_id();
@@ -62,7 +119,8 @@ namespace prj {
          std::printf("\n\033[0m");
       }
       template<typename... Args>
-      static void warn(std::string_view msg, Args... args) {
+      static void warn(std::string_view msg, Args... args)
+      {
          std::scoped_lock  lck(mtx_);
          std::stringstream s;
          s << std::this_thread::get_id();
@@ -71,7 +129,8 @@ namespace prj {
          std::printf("\n\033[0m");
       }
       template<typename... Args>
-      static void error(std::string_view msg, Args... args) {
+      static void error(std::string_view msg, Args... args)
+      {
          std::scoped_lock  lck(mtx_);
          std::stringstream s;
          s << std::this_thread::get_id();
@@ -80,7 +139,8 @@ namespace prj {
          std::printf("\n\033[0m");
       }
       template<typename... Args>
-      static void fatal(std::string_view msg, Args... args) {
+      static void fatal(std::string_view msg, Args... args)
+      {
          std::scoped_lock  lck(mtx_);
          std::stringstream s;
          s << std::this_thread::get_id();
@@ -91,8 +151,10 @@ namespace prj {
 
       // Debug versions, only active if debug_msgs is true.
       template<typename... Args>
-      static void info_d(std::string_view msg, Args... args) {
-         if constexpr (debug_msgs) {
+      static void info_d(std::string_view msg, Args... args)
+      {
+         if constexpr (debug_msgs)
+         {
             std::scoped_lock  lck(mtx_);
             std::stringstream s;
             s << std::this_thread::get_id();
@@ -102,8 +164,10 @@ namespace prj {
          }
       }
       template<typename... Args>
-      static void warn_d(std::string_view msg, Args... args) {
-         if constexpr (debug_msgs) {
+      static void warn_d(std::string_view msg, Args... args)
+      {
+         if constexpr (debug_msgs)
+         {
             std::scoped_lock  lck(mtx_);
             std::stringstream s;
             s << std::this_thread::get_id();
@@ -113,8 +177,10 @@ namespace prj {
          }
       }
       template<typename... Args>
-      static void error_d(std::string_view msg, Args... args) {
-         if constexpr (debug_msgs) {
+      static void error_d(std::string_view msg, Args... args)
+      {
+         if constexpr (debug_msgs)
+         {
             std::scoped_lock  lck(mtx_);
             std::stringstream s;
             s << std::this_thread::get_id();
@@ -124,8 +190,10 @@ namespace prj {
          }
       }
       template<typename... Args>
-      static void fatal_d(std::string_view msg, Args... args) {
-         if constexpr (debug_msgs) {
+      static void fatal_d(std::string_view msg, Args... args)
+      {
+         if constexpr (debug_msgs)
+         {
             std::scoped_lock  lck(mtx_);
             std::stringstream s;
             s << std::this_thread::get_id();
@@ -140,7 +208,8 @@ namespace prj {
    };
 
    // Basic wrapper for OpenCV windows.
-   class Window {
+   class Window
+   {
    public:
       /********** CONSTANTS **********/
       static constexpr size_t max_trckbar_num{ 8 }; // Maximum number of trackbars.
