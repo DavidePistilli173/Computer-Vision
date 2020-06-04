@@ -4,16 +4,19 @@
 #include <opencv2/imgproc.hpp>
 
 // Command line arguments.
-enum class Arg {
+enum class Arg
+{
    img = 1, // Input image.
    tot      // Total number of arguments.
 };
 
 using prj::Log;
 
-int main(int argc, char* argv[]) {
+int main(int argc, char* argv[])
+{
    // Input check.
-   if (argc < static_cast<int>(Arg::tot)) {
+   if (argc < static_cast<int>(Arg::tot))
+   {
       Log::fatal("Wrong number of input arguments.");
       return 1;
    }
@@ -21,7 +24,8 @@ int main(int argc, char* argv[]) {
    // Read the input image.
    Log::info("Loading input image.");
    cv::Mat img{ cv::imread(argv[static_cast<int>(Arg::img)]) };
-   if (img.empty()) {
+   if (img.empty())
+   {
       Log::fatal("Failed to open image %s.", argv[static_cast<int>(Arg::img)]);
       return 1;
    }
@@ -33,7 +37,8 @@ int main(int argc, char* argv[]) {
    // Run the tree detector.
    Log::info("Detecting trees.");
    cv::Mat result{ td.detect(img) };
-   if (result.empty()) {
+   if (result.empty())
+   {
       Log::fatal("Failed to detect trees.");
       return 1;
    }
