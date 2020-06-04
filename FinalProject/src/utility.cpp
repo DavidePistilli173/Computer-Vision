@@ -68,6 +68,8 @@ void Window::trckCallbck_(int val, void* ptr)
 Image::Image(const cv::Mat& mat) :
    mat_{ mat.clone() }
 {
+   // Set the appropriate colour space.
+   // Colour images are considered bgr.
    if (mat_.channels() == 1)
       colSpace_ = ColourSpace::grey;
    else
@@ -91,6 +93,8 @@ Image& Image::operator=(const cv::Mat& mat)
 {
    mat_ = mat.clone();
 
+   // Set the appropriate colour space.
+   // Colour images are considered bgr.
    if (mat_.channels() == 1)
       colSpace_ = ColourSpace::grey;
    else
@@ -99,9 +103,24 @@ Image& Image::operator=(const cv::Mat& mat)
    return *this;
 }
 
+void Image::bilateralFilter(int size, double colour_sig, double space_sig)
+{
+   cv::Mat result;
+   cv::bilateralFilter(
+      mat_,
+      result,
+      size,
+      colour_sig,
+      space_sig);
+   mat_ = result;
+}
+
 void Image::display() const
 {
-   Window win{ "Test" };
+   // The thread ID in the name is required to ensure thread-safe windows.
+   std::stringstream s;
+   s << "Thread " << std::this_thread::get_id();
+   Window win{ s.str() };
    win.showImg(mat_);
    cv::waitKey(0);
 }
@@ -124,27 +143,14 @@ void Image::equaliseHistogram()
    }
 }
 
-void Image::filter(Filter filter, const std::vector<param>& params)
+void Image::gaussianFilter(cv::Size size, double sigma)
 {
    cv::Mat result;
-   switch (filter)
-   {
-   case Filter::bilateral:
-      cv::bilateralFilter(
-         mat_,
-         result,
-         std::get<int>(params[static_cast<int>(BilateralParam::size)]),
-         std::get<double>(params[static_cast<int>(BilateralParam::colour_sig)]),
-         std::get<double>(params[static_cast<int>(BilateralParam::space_sig)]));
-      break;
-   case Filter::gaussian:
-      cv::GaussianBlur(
-         mat_,
-         result,
-         std::get<cv::Size>(params[static_cast<int>(GaussianParam::size)]),
-         std::get<double>(params[static_cast<int>(GaussianParam::sig)]));
-      break;
-   }
+   cv::GaussianBlur(
+      mat_,
+      result,
+      size,
+      sigma);
    mat_ = result;
 }
 

@@ -18,6 +18,12 @@ namespace prj
    /********** CONSTANTS **********/
    constexpr double pi{ 3.14159265358979 };
 
+#ifdef PRJ_DEBUG
+   constexpr bool debug{ true };
+#else
+   constexpr bool debug{ false };
+#endif
+
 #ifdef PRJ_DEBUG_MSGS
    constexpr bool debug_msgs{ true };
 #else
@@ -38,7 +44,7 @@ namespace prj
       v  // Value
    };
 
-   /********** STRUCT **********/
+   /********** STRUCTS **********/
    // Rectangle.
    template<typename T>
    struct Rect
@@ -67,25 +73,19 @@ namespace prj
          bgr,
          hsv
       };
-      // Supported filters,
-      enum class Filter
-      {
-         bilateral,
-         gaussian
-      };
       // Parameters for the bilateral filter.
       enum class BilateralParam
       {
-         size,       // Filter size.
-         colour_sig, // Colour sigma
-         space_sig,  // Space sigma.
+         size,       // Filter size, <int>.
+         colour_sig, // Colour sigma, <double>.
+         space_sig,  // Space sigma, <double>.
          tot         // Total number of parameters.
       };
       // Parameters for the gaussian filter.
       enum class GaussianParam
       {
-         size,
-         sig
+         size, // Filter size, <cv::Size>.
+         sig   // Sigma, <double>.
       };
 
       /********** CONSTRUCTORS **********/
@@ -101,12 +101,14 @@ namespace prj
       Image& operator=(const cv::Mat& mat);
 
       /********** METHODS **********/
+      // Apply a bilateral filter to the image.
+      void bilateralFilter(int size, double colour_sig, double space_sig);
       // Quickly display the image. Used for debug purposes.
       void display() const;
       // Equalise the histogram of the image.
       void equaliseHistogram();
-      // Filter the image.
-      void filter(Filter filter, const std::vector<param>& params);
+      // Apply a Gaussian filter to the image.
+      void gaussianFilter(cv::Size size, double sigma);
       // Get the current colour space of the image.
       [[nodiscard]] ColourSpace getColourSpace() const;
       // Get the stored image.

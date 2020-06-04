@@ -19,8 +19,8 @@ cv::Mat TreeDetector::detect(const cv::Mat& input)
 
    Log::info("Preprocessing.");
    std::array<param, static_cast<int>(PParam::tot)> pParams{
-      29,
-      150.0,
+      13,
+      200.0,
       100.0
    };
    if (!preProcess_(pParams))
@@ -60,15 +60,13 @@ bool TreeDetector::drawResult_()
 bool TreeDetector::preProcess_(std::array<param, static_cast<int>(PParam::tot)>& params)
 {
    Image filteredImg{ resizedInput_ };
-   filteredImg.display();
+   if constexpr (debug) filteredImg.display();
 
-   filteredImg.filter(
-      Image::Filter::bilateral,
-      std::vector{
-         params[static_cast<int>(PParam::bi_size)],
-         params[static_cast<int>(PParam::bi_colour_s)],
-         params[static_cast<int>(PParam::bi_space_s)] });
+   filteredImg.bilateralFilter(
+      std::get<int>(params[static_cast<int>(PParam::bi_size)]),
+      std::get<double>(params[static_cast<int>(PParam::bi_colour_s)]),
+      std::get<double>(params[static_cast<int>(PParam::bi_space_s)]));
 
-   filteredImg.display();
+   if constexpr (debug) filteredImg.display();
    return true;
 }
