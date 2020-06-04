@@ -65,24 +65,6 @@ void Window::trckCallbck_(int val, void* ptr)
    winPtr->trckModified_ = true; // Set the modification flag.
 }
 
-void prj::displayImage(const cv::Mat& img)
-{
-   Window win{ "Test" };
-   win.showImg(img);
-   cv::waitKey(0);
-}
-
-bool prj::equaliseImg(cv::Mat& img)
-{
-   std::vector<cv::Mat> channels;
-   cv::split(img, channels);
-
-   cv::equalizeHist(channels[static_cast<int>(HSV::v)], channels[static_cast<int>(HSV::v)]);
-
-   cv::merge(channels, img);
-   return true;
-}
-
 Image::Image(const cv::Mat& mat) :
    mat_{ mat.clone() }
 {
@@ -96,14 +78,89 @@ Image::Image(const Image& img) :
    mat_{ img.mat_.clone() },
    colSpace_{ img.colSpace_ } {}
 
+Image& Image::operator=(const Image& img)
+{
+   if (&img == this) return *this;
+
+   mat_ = img.mat_.clone();
+   colSpace_ = img.colSpace_;
+   return *this;
+}
+
+Image& Image::operator=(const cv::Mat& mat)
+{
+   mat_ = mat.clone();
+
+   if (mat_.channels() == 1)
+      colSpace_ = ColourSpace::grey;
+   else
+      colSpace_ = ColourSpace::bgr;
+
+   return *this;
+}
+
+void Image::display() const
+{
+   Window win{ "Test" };
+   win.showImg(mat_);
+   cv::waitKey(0);
+}
+
+void Image::equaliseHistogram()
+{
+   switch (colSpace_)
+   {
+   case ColourSpace::grey:
+      cv::equalizeHist(mat_, mat_);
+      break;
+   case ColourSpace::bgr:
+      setColourSpace(ColourSpace::hsv);
+      equaliseHSV_();
+      setColourSpace(ColourSpace::bgr);
+      break;
+   case ColourSpace::hsv:
+      equaliseHSV_();
+      break;
+   }
+}
+
+void Image::filter(Filter filter, const std::vector<param>& params)
+{
+   cv::Mat result;
+   switch (filter)
+   {
+   case Filter::bilateral:
+      cv::bilateralFilter(
+         mat_,
+         result,
+         std::get<int>(params[static_cast<int>(BilateralParam::size)]),
+         std::get<double>(params[static_cast<int>(BilateralParam::colour_sig)]),
+         std::get<double>(params[static_cast<int>(BilateralParam::space_sig)]));
+      break;
+   case Filter::gaussian:
+      cv::GaussianBlur(
+         mat_,
+         result,
+         std::get<cv::Size>(params[static_cast<int>(GaussianParam::size)]),
+         std::get<double>(params[static_cast<int>(GaussianParam::sig)]));
+      break;
+   }
+   mat_ = result;
+}
+
 Image::ColourSpace Image::getColourSpace() const
 {
    return colSpace_;
 }
 
-cv::Mat& Image::getImage()
+const cv::Mat& Image::image() const
 {
    return mat_;
+}
+
+void prj::Image::resize(const cv::Size& newSize)
+{
+   cv::resize(mat_, mat_, newSize);
 }
 
 void Image::setColourSpace(ColourSpace newColSpace)
@@ -147,4 +204,14 @@ void Image::setColourSpace(ColourSpace newColSpace)
    }
 
    colSpace_ = newColSpace;
+}
+
+void Image::equaliseHSV_()
+{
+   std::vector<cv::Mat> channels;
+   cv::split(mat_, channels);
+
+   cv::equalizeHist(channels[static_cast<int>(HSV::v)], channels[static_cast<int>(HSV::v)]);
+
+   cv::merge(channels, mat_);
 }

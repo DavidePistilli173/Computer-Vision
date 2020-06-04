@@ -36,7 +36,7 @@ namespace prj
 
       /********** METHODS **********/
       // Detect trees and output the result.
-      cv::Mat detect(cv::Mat input);
+      cv::Mat detect(const cv::Mat& input);
 
    private:
       /********** METHODS **********/
@@ -48,8 +48,8 @@ namespace prj
       bool preProcess_(std::array<param, static_cast<int>(PParam::tot)>& params);
 
       /********** VARIABLES **********/
-      cv::Mat resizedInput_; // Resized input image.
-      cv::Mat result_;       // Final result.
+      Image resizedInput_; // Resized input image.
+      Image result_;       // Final result.
    };
 } // namespace prj
 

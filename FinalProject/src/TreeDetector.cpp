@@ -6,7 +6,7 @@ using namespace prj;
 
 const cv::Size TreeDetector::analysis_res{ 500, 500 };
 
-cv::Mat TreeDetector::detect(cv::Mat input)
+cv::Mat TreeDetector::detect(const cv::Mat& input)
 {
    Log::info("Resizing image.");
    // Used to convert tree coordinates back to the input's coordinate frame.
@@ -14,7 +14,8 @@ cv::Mat TreeDetector::detect(cv::Mat input)
       static_cast<float>(input.cols) / analysis_res.width,
       static_cast<float>(input.rows) / analysis_res.height
    };
-   cv::resize(input, resizedInput_, analysis_res);
+   resizedInput_ = input;
+   resizedInput_.resize(analysis_res);
 
    Log::info("Preprocessing.");
    std::array<param, static_cast<int>(PParam::tot)> pParams{
@@ -43,7 +44,7 @@ cv::Mat TreeDetector::detect(cv::Mat input)
       return cv::Mat{};
    }
 
-   return result_;
+   return result_.image();
 }
 
 bool TreeDetector::analyse_(std::array<param, static_cast<int>(AParam::tot)>& params)
@@ -58,28 +59,16 @@ bool TreeDetector::drawResult_()
 
 bool TreeDetector::preProcess_(std::array<param, static_cast<int>(PParam::tot)>& params)
 {
-   cv::Mat filteredImg;
-   cv::Mat hsvInputImg;
-   cv::cvtColor(resizedInput_, hsvInputImg, cv::COLOR_BGR2HSV);
+   Image filteredImg{ resizedInput_ };
+   filteredImg.display();
 
-   switch (resizedInput_.type)
-   {
-   case CV_8UC1:
-      cv::equalizeHist(resizedInput_, filteredImg);
-      break;
-   default:
-      equaliseImg(hsvInputImg);
-      cv::cvtColor(hsvInputImg, filteredImg, cv::COLOR_HSV2BGR);
-   }
+   filteredImg.filter(
+      Image::Filter::bilateral,
+      std::vector{
+         params[static_cast<int>(PParam::bi_size)],
+         params[static_cast<int>(PParam::bi_colour_s)],
+         params[static_cast<int>(PParam::bi_space_s)] });
 
-   cv::bilateralFilter(
-      filteredImg,
-      filteredImg,
-      std::get<int>(params[static_cast<int>(PParam::bi_size)]),
-      std::get<double>(params[static_cast<int>(PParam::bi_colour_s)]),
-      std::get<double>(params[static_cast<int>(PParam::bi_space_s)]));
-
-   displayImage(resizedInput_);
-   displayImage(filteredImg);
+   filteredImg.display();
    return true;
 }

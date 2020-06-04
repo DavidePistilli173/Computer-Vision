@@ -13,7 +13,7 @@
 namespace prj
 {
    /********** TYPEDEFS **********/
-   using param = std::variant<int, float, double>; // Generic parameter of different types.
+   using param = std::variant<int, float, double, cv::Size>; // Generic parameter of different types.
 
    /********** CONSTANTS **********/
    constexpr double pi{ 3.14159265358979 };
@@ -37,12 +37,6 @@ namespace prj
       s, // Saturation
       v  // Value
    };
-
-   /********** FUNCTIONS **********/
-   // Quickly display an image. Used for debug purposes.
-   void displayImage(const cv::Mat& img);
-   // Equalise the histogram of an HSV image.
-   bool equaliseImg(cv::Mat& img);
 
    /********** STRUCT **********/
    // Rectangle.
@@ -73,22 +67,59 @@ namespace prj
          bgr,
          hsv
       };
+      // Supported filters,
+      enum class Filter
+      {
+         bilateral,
+         gaussian
+      };
+      // Parameters for the bilateral filter.
+      enum class BilateralParam
+      {
+         size,       // Filter size.
+         colour_sig, // Colour sigma
+         space_sig,  // Space sigma.
+         tot         // Total number of parameters.
+      };
+      // Parameters for the gaussian filter.
+      enum class GaussianParam
+      {
+         size,
+         sig
+      };
 
       /********** CONSTRUCTORS **********/
+      Image() = default;
       explicit Image(const cv::Mat& mat);
       Image(const Image& img);
       Image(Image&&) = default;
-      ~Image()       = default;
+      ~Image() = default;
+
+      /********** OPERATORS **********/
+      Image& operator=(const Image& img);
+      Image& operator=(Image&&) = default;
+      Image& operator=(const cv::Mat& mat);
 
       /********** METHODS **********/
+      // Quickly display the image. Used for debug purposes.
+      void display() const;
+      // Equalise the histogram of the image.
+      void equaliseHistogram();
+      // Filter the image.
+      void filter(Filter filter, const std::vector<param>& params);
       // Get the current colour space of the image.
-      ColourSpace getColourSpace() const;
+      [[nodiscard]] ColourSpace getColourSpace() const;
       // Get the stored image.
-      cv::Mat& getImage();
+      [[nodiscard]] const cv::Mat& image() const;
+      // Resize the image.
+      void resize(const cv::Size& newSize);
       // Set the colour space of the image.
       void setColourSpace(ColourSpace newColSpace);
 
    private:
+      /********** METHODS **********/
+      void equaliseHSV_();
+
       /********** VARIABLES **********/
       cv::Mat     mat_;
       ColourSpace colSpace_{ ColourSpace::grey };
@@ -217,7 +248,7 @@ namespace prj
       /********** CONSTRUCTORS **********/
       explicit Window(std::string_view name);
       Window(const Window&) = delete;
-      Window(Window&& win)  = delete;
+      Window(Window&& win) = delete;
       ~Window();
 
       /********** OPERATORS **********/
