@@ -17,12 +17,16 @@ namespace prj
       // Preprocessing parameters.
       enum class PParam
       {
-         bi_size,     // Size of the bilateral filter.
-         bi_colour_s, // Colour sigma for the bilateral filter.
-         bi_space_s,  // Space sigma for the bilateral filter.
-         canny_th1,   // Threshold 1 for Canny.
-         canny_th2,   // Threshold 2 for Canny.
-         tot          // Total number of parameters.
+         gauss_size,    // Size of the Gaussian filter.
+         gauss_sig,     // Sigma of the Gaussian filter.
+         bil_size,      // Size of the bilateral filter.
+         bil_col_sig,   // Colour sigma of the bilateral filter.
+         bil_space_sig, // Space sigma of the bilateral filter.
+         eq_th,         // Equalisation threshold.
+         canny_th1,     // Threshold 1 for Canny.
+         canny_th2,     // Threshold 2 for Canny.
+         dist_th,       // Threshold for the distance transform result.
+         tot            // Total number of parameters.
       };
       // Analysis parameters.
       enum class AParam

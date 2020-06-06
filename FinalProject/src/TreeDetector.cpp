@@ -1,6 +1,7 @@
 #include "TreeDetector.hpp"
 
 #include <opencv2/imgproc.hpp>
+#include <thread>
 
 using namespace prj;
 
@@ -19,11 +20,15 @@ cv::Mat TreeDetector::detect(const cv::Mat& input)
 
    Log::info("Preprocessing.");
    std::array<param, static_cast<int>(PParam::tot)> pParams{
-      13,
-      250.0,
+      cv::Size{ 9, 9 },
+      3.5,
+      29,
       100.0,
-      90.0,
-      120.0
+      100.0,
+      0.076F,
+      30.0,
+      60.0,
+      0.45
    };
    if (!preProcess_(pParams))
    {
@@ -64,18 +69,35 @@ bool TreeDetector::preProcess_(std::array<param, static_cast<int>(PParam::tot)>&
    Image filteredImg{ resizedInput_ };
    if constexpr (debug) filteredImg.display();
 
+   filteredImg.gaussianFilter(
+      std::get<cv::Size>(params[static_cast<int>(PParam::gauss_size)]),
+      std::get<double>(params[static_cast<int>(PParam::gauss_sig)]));
+
    filteredImg.bilateralFilter(
-      std::get<int>(params[static_cast<int>(PParam::bi_size)]),
-      std::get<double>(params[static_cast<int>(PParam::bi_colour_s)]),
-      std::get<double>(params[static_cast<int>(PParam::bi_space_s)]));
+      std::get<int>(params[static_cast<int>(PParam::bil_size)]),
+      std::get<double>(params[static_cast<int>(PParam::bil_col_sig)]),
+      std::get<double>(params[static_cast<int>(PParam::bil_space_sig)]));
 
    if constexpr (debug) filteredImg.display();
 
-   filteredImg.canny(
+   Image equalisedFilteredImg{ filteredImg };
+
+   filteredImg.segment(
       std::get<double>(params[static_cast<int>(PParam::canny_th1)]),
-      std::get<double>(params[static_cast<int>(PParam::canny_th2)]));
+      std::get<double>(params[static_cast<int>(PParam::canny_th2)]),
+      std::get<double>(params[static_cast<int>(PParam::dist_th)]));
 
-   if constexpr (debug) filteredImg.display();
+   equalisedFilteredImg.equaliseHistogram();
+   equalisedFilteredImg.segment(
+      std::get<double>(params[static_cast<int>(PParam::canny_th1)]),
+      std::get<double>(params[static_cast<int>(PParam::canny_th2)]),
+      std::get<double>(params[static_cast<int>(PParam::dist_th)]));
+
+   std::thread t1{ [filteredImg]() { filteredImg.display("Not equalised", true); } };
+   std::thread t2{ [equalisedFilteredImg]() { equalisedFilteredImg.display("Equalised", true); } };
+   resizedInput_.display(std::string_view{ "Input" });
+   t1.join();
+   t2.join();
 
    return true;
 }

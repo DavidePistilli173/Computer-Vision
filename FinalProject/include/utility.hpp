@@ -96,6 +96,7 @@ namespace prj
       /********** CONSTRUCTORS **********/
       Image() = default;
       explicit Image(const cv::Mat& mat);
+      explicit Image(cv::Mat&& mat);
       Image(const Image& img);
       Image(Image&&) = default;
       ~Image() = default;
@@ -110,8 +111,22 @@ namespace prj
       void bilateralFilter(int size, double colour_sig, double space_sig);
       // Apply the Canny edge detector.
       void canny(double th1, double th2);
-      // Quickly display the image. Used for debug purposes.
-      void display() const;
+      // Compute the connected components of the image.
+      void connectedComponents();
+      // Compute the average local constrast of the image.
+      [[nodiscard]] float contrast();
+      // Change the data type used for each channel.
+      void convert(int type);
+      // Dilate the image.
+      void dilate(cv::Mat kernel);
+      // Display the image.
+      void display(bool useLabels = false) const;
+      // Display the image in a window with custom name.
+      void display(std::string_view winName, bool useLabels = false) const;
+      // Compute the distance transform.
+      void distanceTransform();
+      // Erode the image.
+      void erode(cv::Mat kernel);
       // Equalise the histogram of the image.
       void equaliseHistogram();
       // Apply a Gaussian filter to the image.
@@ -120,18 +135,33 @@ namespace prj
       [[nodiscard]] ColourSpace getColourSpace() const;
       // Get the stored image.
       [[nodiscard]] const cv::Mat& image() const;
+      // Get the image labels.
+      [[nodiscard]] const cv::Mat& labels() const;
+      // Apply the log transform to the image.
+      void log();
+      // Compute the mean value for each channel of the image.
+      cv::Scalar mean() const;
+      // Compute the negative image.
+      void negative();
+      // Normalise the image values.
+      void normalise(double lowerLimit, double upperLimit, int normType);
       // Resize the image.
       void resize(const cv::Size& newSize);
+      // Segment the image.
+      void segment(double cannyTh1, double cannyTh2, double distTh);
       // Set the colour space of the image.
       void setColourSpace(ColourSpace newColSpace);
+      // Apply a threshold the image values.
+      void threshold(double th, double maxVal, int type);
 
    private:
       /********** METHODS **********/
       void equaliseHSV_();
 
       /********** VARIABLES **********/
-      cv::Mat     mat_;
-      ColourSpace colSpace_{ ColourSpace::grey };
+      cv::Mat     mat_;                           // Image data.
+      cv::Mat     labels_;                        // Labels for image pixels.
+      ColourSpace colSpace_{ ColourSpace::grey }; // Current colour space of the image.
    };
 
    // Basic console logging functions.
