@@ -1,4 +1,5 @@
 #include "TreeDetector.hpp"
+#include "TreeDetectorTrainer.hpp"
 #include "utility.hpp"
 
 #include <opencv2/imgproc.hpp>
@@ -6,9 +7,14 @@
 // Command line arguments.
 enum class Arg
 {
-   img = 1, // Input image.
-   tot      // Total number of arguments.
+   mode = 1, // Execution mode: train / detect.
+   file,     // Dataset text file / Training result.
+   img,      // Dataset folder / Input image.
+   tot       // Total number of arguments.
 };
+
+constexpr std::string_view train_mode{ "train" };   // Training mode keyword.
+constexpr std::string_view detect_mode{ "detect" }; // Detection mode keyword.
 
 using prj::Log;
 
@@ -21,28 +27,45 @@ int main(int argc, char* argv[])
       return 1;
    }
 
-   // Read the input image.
-   Log::info("Loading input image.");
-   cv::Mat img{ cv::imread(argv[static_cast<int>(Arg::img)]) };
-   if (img.empty())
+   // Training mode.
+   if (argv[static_cast<int>(Arg::mode)] == train_mode)
    {
-      Log::fatal("Failed to open image %s.", argv[static_cast<int>(Arg::img)]);
-      return 1;
+      prj::TreeDetectorTrainer trainer;
+      Log::info("Training started.");
+      if (!trainer.train(argv[static_cast<int>(Arg::file)], argv[static_cast<int>(Arg::img)]))
+      {
+         Log::fatal("Failed to train the detector.");
+         Log::fatal("Configuration file: %s.", argv[static_cast<int>(Arg::file)]);
+         Log::fatal("Dataset folder: %s.", argv[static_cast<int>(Arg::img)]);
+         return 1;
+      }
    }
-
-   // Initialise the tree detector.
-   Log::info("Initialising the tree detector.");
-   prj::TreeDetector td;
-
-   // Run the tree detector.
-   Log::info("Detecting trees.");
-   cv::Mat result{ td.detect(img) };
-   if (result.empty())
+   // Detection mode.
+   else if (argv[static_cast<int>(Arg::mode)] == detect_mode)
    {
-      Log::fatal("Failed to detect trees.");
-      return 1;
+      // Read the input image.
+      Log::info("Loading input image.");
+      cv::Mat img{ cv::imread(argv[static_cast<int>(Arg::img)]) };
+      if (img.empty())
+      {
+         Log::fatal("Failed to open image %s.", argv[static_cast<int>(Arg::img)]);
+         return 1;
+      }
+
+      // Initialise the tree detector.
+      Log::info("Initialising the tree detector.");
+      prj::TreeDetector td;
+
+      // Run the tree detector.
+      Log::info("Detecting trees.");
+      cv::Mat result{ td.detect(img) };
+      if (result.empty())
+      {
+         Log::fatal("Failed to detect trees.");
+         return 1;
+      }
+      Log::info("Detection complete.");
    }
-   Log::info("Detection complete.");
 
    return 0;
 }

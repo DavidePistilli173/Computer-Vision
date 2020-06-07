@@ -49,9 +49,12 @@ namespace prj
    template<typename T>
    struct Rect
    {
+      static constexpr int fields{ 4 }; // Number of fields.
       constexpr Rect() = default;
       constexpr Rect(const T px, const T py, const T pw, const T ph) :
          x{ px }, y{ py }, w{ pw }, h{ ph } {}
+      constexpr Rect(std::array<T, fields> data) :
+         x{ data[0] }, y{ data[1] }, w{ data[2] }, h{ data[3] } {}
 
       // Position of the top-left vertex.
       T x{};
@@ -72,25 +75,6 @@ namespace prj
          grey, // Greyscale.
          bgr,
          hsv
-      };
-      // Parameters for the bilateral filter.
-      enum class BilateralParam
-      {
-         size,       // Filter size, <int>.
-         colour_sig, // Colour sigma, <double>.
-         space_sig   // Space sigma, <double>.
-      };
-      // Parameters for the Canny edge detector.
-      enum class CannyParam
-      {
-         th1,
-         th2
-      };
-      // Parameters for the gaussian filter.
-      enum class GaussianParam
-      {
-         size, // Filter size, <cv::Size>.
-         sig   // Sigma, <double>.
       };
 
       /********** CONSTRUCTORS **********/

@@ -32,8 +32,8 @@ add_executable(
     ${PROJECT_NAME} 
     "src/prj_main.cpp"
     "src/utility.cpp"
-    
-  "src/TreeDetector.cpp")
+    "src/TreeDetector.cpp"
+    "src/TreeDetectorTrainer.cpp")
 
 # If on Unix, link to Pthread as well.
 if (WIN32)
