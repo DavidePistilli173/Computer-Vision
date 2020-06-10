@@ -40,7 +40,7 @@ namespace prj
       static const cv::Scalar tree_colour;     // Colour of the tree box.
 
       /********** CONSTRUCTOR **********/
-      TreeDetector(std::string_view bowFile);
+      explicit TreeDetector(std::string_view bowFile);
 
       /********** METHODS **********/
       // Detect trees and output the result.

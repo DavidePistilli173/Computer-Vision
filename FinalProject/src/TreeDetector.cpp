@@ -78,7 +78,7 @@ bool TreeDetector::analyse_(std::array<param, static_cast<int>(AParam::tot)>& pa
    std::vector<std::vector<Rect<int>>> regions;
    for (const auto& img : processedImgs_)
    {
-      regions.emplace_back(img.getRegions());
+      regions.emplace_back(img.getRegions(Image::RegionType::label));
    }
 
    auto sift = cv::xfeatures2d::SIFT::create(num_features);
@@ -172,14 +172,15 @@ bool TreeDetector::preProcess_(std::array<param, static_cast<int>(PParam::tot)>&
       std::get<double>(params[static_cast<int>(PParam::dist_th)]));
 
    equalisedFilteredImg.equaliseHistogram();
+
    equalisedFilteredImg.segment(
       std::get<double>(params[static_cast<int>(PParam::canny_th1)]),
       std::get<double>(params[static_cast<int>(PParam::canny_th2)]),
       std::get<double>(params[static_cast<int>(PParam::dist_th)]));
 
    if constexpr (debug) resizedInput_.display();
-   if constexpr (debug) filteredImg.display(true);
-   if constexpr (debug) equalisedFilteredImg.display(true);
+   if constexpr (debug) filteredImg.display(Image::RegionType::label);
+   if constexpr (debug) equalisedFilteredImg.display(Image::RegionType::label);
 
    processedImgs_.reserve(2);
    processedImgs_.emplace_back(filteredImg);

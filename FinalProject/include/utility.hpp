@@ -5,6 +5,7 @@
 #include <mutex>
 #include <opencv2/core.hpp>
 #include <opencv2/highgui.hpp>
+#include <opencv2/xfeatures2d.hpp>
 #include <string_view>
 #include <thread>
 #include <variant>
@@ -96,10 +97,19 @@ namespace prj
       {
          rect
       };
+      // Region types.
+      enum class RegionType
+      {
+         none,
+         blob,
+         label
+      };
 
       /********** CONSTANTS **********/
       // Thickness of a line wrt the smallest image dimension.
       static constexpr float thickness_coeff{ 0.0025F };
+      // Default drawing colour.
+      static const cv::Scalar default_colour;
 
       /********** CONSTRUCTORS **********/
       Image() = default;
@@ -117,6 +127,8 @@ namespace prj
       /********** METHODS **********/
       // Apply a bilateral filter to the image.
       void bilateralFilter(int size, double colour_sig, double space_sig);
+      // Perform blob detection on the image.
+      void blobDetection(const cv::SimpleBlobDetector::Params& params);
       // Apply the Canny edge detector.
       void canny(double th1, double th2);
       // Compute the connected components of the image.
@@ -130,9 +142,9 @@ namespace prj
       // Dilate the image.
       void dilate(cv::Mat kernel);
       // Display the image.
-      void display(bool useLabels = false) const;
+      void display(RegionType type = RegionType::none) const;
       // Display the image in a window with custom name.
-      void display(std::string_view winName, bool useLabels = false) const;
+      void display(std::string_view winName, RegionType type = RegionType::none) const;
       // Compute the distance transform.
       void distanceTransform();
       // Erode the image.
@@ -144,7 +156,7 @@ namespace prj
       // Get the current colour space of the image.
       [[nodiscard]] ColourSpace getColourSpace() const;
       // Get a rectangle for each segment of the image.
-      [[nodiscard]] std::vector<Rect<int>> getRegions() const;
+      [[nodiscard]] std::vector<Rect<int>> getRegions(RegionType type = RegionType::label) const;
       // Get the stored image.
       [[nodiscard]] const cv::Mat& image() const;
       // Get the image labels.
@@ -168,12 +180,17 @@ namespace prj
 
    private:
       /********** METHODS **********/
-      void equaliseHSV_();
+      [[nodiscard]] std::vector<Rect<int>> computeBlobRegions_() const;
+      [[nodiscard]] std::vector<Rect<int>> computeLabelRegions_() const;
+      [[nodiscard]] cv::Mat                drawBlobs_() const;
+      [[nodiscard]] cv::Mat                drawLabels_() const;
+      void                                 equaliseHSV_();
 
       /********** VARIABLES **********/
-      cv::Mat     mat_;                           // Image data.
-      cv::Mat     labels_;                        // Labels for image pixels.
-      ColourSpace colSpace_{ ColourSpace::grey }; // Current colour space of the image.
+      cv::Mat                   mat_;                           // Image data.
+      cv::Mat                   labels_;                        // Labels for image pixels.
+      std::vector<cv::KeyPoint> blobs_;                         // List of blobs in the image.
+      ColourSpace               colSpace_{ ColourSpace::grey }; // Current colour space of the image.
    };
 
    // Basic console logging functions.

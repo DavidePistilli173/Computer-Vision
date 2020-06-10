@@ -6,6 +6,8 @@
 
 using namespace prj;
 
+const cv::Scalar Image::default_colour{ 0, 0, 255 };
+
 std::mutex Log::mtx_;
 
 Window::Window(std::string_view name) :
@@ -94,6 +96,7 @@ Image::Image(cv::Mat&& mat) :
 Image::Image(const Image& img) :
    mat_{ img.mat_.clone() },
    labels_{ img.labels_.clone() },
+   blobs_{ img.blobs_ },
    colSpace_{ img.colSpace_ } {}
 
 Image& Image::operator=(const Image& img)
@@ -102,6 +105,7 @@ Image& Image::operator=(const Image& img)
 
    mat_ = img.mat_.clone();
    labels_ = img.labels_.clone();
+   blobs_ = img.blobs_;
    colSpace_ = img.colSpace_;
    return *this;
 }
@@ -131,6 +135,12 @@ void Image::bilateralFilter(int size, double colour_sig, double space_sig)
       colour_sig,
       space_sig);
    mat_ = result;
+}
+
+void Image::blobDetection(const cv::SimpleBlobDetector::Params& params)
+{
+   auto detector = cv::SimpleBlobDetector::create(params);
+   detector->detect(mat_, blobs_);
 }
 
 void prj::Image::canny(double th1, double th2)
@@ -198,47 +208,29 @@ void Image::dilate(cv::Mat kernel)
    cv::dilate(mat_, mat_, kernel);
 }
 
-void Image::display(bool useLabels) const
+void Image::display(RegionType type) const
 {
    // The thread ID in the name is required to ensure thread-safe windows.
    std::stringstream s;
    s << "Thread " << std::this_thread::get_id();
-   display(s.str(), useLabels);
+   display(s.str(), type);
 }
 
-void Image::display(std::string_view winName, bool useLabels) const
+void Image::display(std::string_view winName, RegionType type) const
 {
    Window win{ winName };
 
-   if (!useLabels)
-      win.showImg(mat_);
-   else
+   switch (type)
    {
-      cv::Mat                result = cv::Mat::zeros(cv::Size{ mat_.cols, mat_.rows }, CV_8UC3);
-      std::vector<cv::Vec3b> colours;
-      for (int i = 0; i < mat_.rows; ++i)
-      {
-         for (int j = 0; j < mat_.cols; ++j)
-         {
-            if (int currentLabel{ labels_.at<int>(i, j) }; currentLabel != -1)
-            {
-               if (size_t prevSize{ colours.size() }; colours.size() <= currentLabel)
-               {
-                  colours.resize(currentLabel + 1);
-                  for (; prevSize < colours.size(); ++prevSize)
-                  {
-                     colours[prevSize] = {
-                        static_cast<unsigned char>(cv::theRNG().uniform(0, std::numeric_limits<unsigned char>::max())),
-                        static_cast<unsigned char>(cv::theRNG().uniform(0, std::numeric_limits<unsigned char>::max())),
-                        static_cast<unsigned char>(cv::theRNG().uniform(0, std::numeric_limits<unsigned char>::max()))
-                     };
-                  }
-               }
-               result.at<cv::Vec3b>(i, j) = colours[currentLabel];
-            }
-         }
-      }
-      win.showImg(result);
+   case RegionType::none:
+      win.showImg(mat_);
+      break;
+   case RegionType::label:
+      win.showImg(drawLabels_());
+      break;
+   case RegionType::blob:
+      win.showImg(drawBlobs_());
+      break;
    }
 
    cv::waitKey(0);
@@ -288,59 +280,20 @@ Image::ColourSpace Image::getColourSpace() const
    return colSpace_;
 }
 
-std::vector<Rect<int>> Image::getRegions() const
+std::vector<Rect<int>> Image::getRegions(RegionType type) const
 {
-   std::vector<Rect<int>> result;
-   std::vector<int>       ids;
-
-   // Scan the entire label image.
-   for (int y = 0; y < labels_.rows; ++y)
+   switch (type)
    {
-      for (int x = 0; x < labels_.cols; ++x)
-      {
-         if (int currentLabel{ labels_.at<int>(y, x) }; currentLabel != -1)
-         {
-            auto currentId = std::find(ids.begin(), ids.end(), currentLabel);
-            // If the current label is new, add it.
-            if (currentId == ids.end())
-            {
-               ids.emplace_back(currentLabel);
-               result.emplace_back(x, y, 1, 1);
-            }
-            // Otherwise update the rectangle.
-            else
-            {
-               long long index{ std::distance(ids.begin(), currentId) };
-               if (!result[index].isInside(x, y))
-               {
-                  // Update x and w.
-                  if (x < result[index].x)
-                  {
-                     result[index].w += (result[index].x - x);
-                     result[index].x = x;
-                  }
-                  else if (int maxX{ result[index].x + result[index].w }; x > maxX)
-                  {
-                     result[index].w += (x - maxX);
-                  }
-
-                  // Update y and h.
-                  if (y < result[index].y)
-                  {
-                     result[index].h += (result[index].y - y);
-                     result[index].y = y;
-                  }
-                  else if (int maxY{ result[index].y + result[index].h }; y > maxY)
-                  {
-                     result[index].h += (y - maxY);
-                  }
-               }
-            }
-         }
-      }
+   case RegionType::none:
+      return std::vector<Rect<int>>();
+      break;
+   case RegionType::label:
+      return computeLabelRegions_();
+      break;
+   case RegionType::blob:
+      return computeBlobRegions_();
+      break;
    }
-
-   return result;
 }
 
 const cv::Mat& Image::image() const
@@ -467,6 +420,118 @@ void Image::setColourSpace(ColourSpace newColSpace)
 void Image::threshold(double th, double maxVal, int type)
 {
    cv::threshold(mat_, mat_, th, maxVal, type);
+}
+
+std::vector<Rect<int>> prj::Image::computeBlobRegions_() const
+{
+   std::vector<Rect<int>> result;
+   result.reserve(blobs_.size());
+
+   for (const auto& blob : blobs_)
+   {
+      float     radius{ blob.size / 2.0F };
+      Rect<int> rect;
+      rect.x = cvRound(blob.pt.x - radius);
+      rect.y = cvRound(blob.pt.y - radius);
+      rect.w = cvRound(rect.x + blob.size);
+      rect.h = cvRound(rect.y + blob.size);
+      result.emplace_back(rect);
+   }
+
+   return result;
+}
+
+std::vector<Rect<int>> prj::Image::computeLabelRegions_() const
+{
+   std::vector<Rect<int>> result;
+   std::vector<int>       ids;
+
+   // Scan the entire label image.
+   for (int y = 0; y < labels_.rows; ++y)
+   {
+      for (int x = 0; x < labels_.cols; ++x)
+      {
+         if (int currentLabel{ labels_.at<int>(y, x) }; currentLabel != -1)
+         {
+            auto currentId = std::find(ids.begin(), ids.end(), currentLabel);
+            // If the current label is new, add it.
+            if (currentId == ids.end())
+            {
+               ids.emplace_back(currentLabel);
+               result.emplace_back(x, y, 1, 1);
+            }
+            // Otherwise update the rectangle.
+            else
+            {
+               long long index{ std::distance(ids.begin(), currentId) };
+               if (!result[index].isInside(x, y))
+               {
+                  // Update x and w.
+                  if (x < result[index].x)
+                  {
+                     result[index].w += (result[index].x - x);
+                     result[index].x = x;
+                  }
+                  else if (int maxX{ result[index].x + result[index].w }; x > maxX)
+                  {
+                     result[index].w += (x - maxX);
+                  }
+
+                  // Update y and h.
+                  if (y < result[index].y)
+                  {
+                     result[index].h += (result[index].y - y);
+                     result[index].y = y;
+                  }
+                  else if (int maxY{ result[index].y + result[index].h }; y > maxY)
+                  {
+                     result[index].h += (y - maxY);
+                  }
+               }
+            }
+         }
+      }
+   }
+
+   return result;
+}
+
+cv::Mat Image::drawBlobs_() const
+{
+   cv::Mat result{ mat_.clone() };
+
+   cv::drawKeypoints(mat_, blobs_, result, default_colour, cv::DrawMatchesFlags::DRAW_RICH_KEYPOINTS);
+
+   return result;
+}
+
+cv::Mat Image::drawLabels_() const
+{
+   cv::Mat                result = cv::Mat::zeros(cv::Size{ mat_.cols, mat_.rows }, CV_8UC3);
+   std::vector<cv::Vec3b> colours;
+   for (int i = 0; i < mat_.rows; ++i)
+   {
+      for (int j = 0; j < mat_.cols; ++j)
+      {
+         if (int currentLabel{ labels_.at<int>(i, j) }; currentLabel != -1)
+         {
+            if (size_t prevSize{ colours.size() }; colours.size() <= currentLabel)
+            {
+               colours.resize(currentLabel + 1);
+               for (; prevSize < colours.size(); ++prevSize)
+               {
+                  colours[prevSize] = {
+                     static_cast<unsigned char>(cv::theRNG().uniform(0, std::numeric_limits<unsigned char>::max())),
+                     static_cast<unsigned char>(cv::theRNG().uniform(0, std::numeric_limits<unsigned char>::max())),
+                     static_cast<unsigned char>(cv::theRNG().uniform(0, std::numeric_limits<unsigned char>::max()))
+                  };
+               }
+            }
+            result.at<cv::Vec3b>(i, j) = colours[currentLabel];
+         }
+      }
+   }
+   return result;
 }
 
 void Image::equaliseHSV_()
