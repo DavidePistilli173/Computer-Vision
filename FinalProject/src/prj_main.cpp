@@ -15,6 +15,7 @@ enum class Arg
 
 constexpr std::string_view train_mode{ "train" };   // Training mode keyword.
 constexpr std::string_view detect_mode{ "detect" }; // Detection mode keyword.
+constexpr std::string_view output_win{ "Trees" };   // Output window name.
 
 using prj::Log;
 
@@ -54,7 +55,7 @@ int main(int argc, char* argv[])
 
       // Initialise the tree detector.
       Log::info("Initialising the tree detector.");
-      prj::TreeDetector td;
+      prj::TreeDetector td{ argv[static_cast<int>(Arg::file)] };
 
       // Run the tree detector.
       Log::info("Detecting trees.");
@@ -65,6 +66,10 @@ int main(int argc, char* argv[])
          return 1;
       }
       Log::info("Detection complete.");
+
+      prj::Window output{ output_win };
+      output.showImg(result);
+      cv::waitKey(0);
    }
 
    return 0;

@@ -1,5 +1,5 @@
-#ifndef LAB5_HPP
-#define LAB5_HPP
+#ifndef PRJ_UTILITY_HPP
+#define PRJ_UTILITY_HPP
 
 #include <cstdio>
 #include <mutex>
@@ -16,7 +16,14 @@ namespace prj
    using param = std::variant<int, float, double, cv::Size>; // Generic parameter of different types.
 
    /********** CONSTANTS **********/
-   constexpr double pi{ 3.14159265358979 };
+   // Tag for tree words.
+   constexpr std::string_view xml_words{ "Words" };
+   // Tag for tree histogram.
+   constexpr std::string_view xml_hist{ "histogram" };
+   // Number of features for each tree.
+   constexpr int num_features{ 1000 };
+   // Number of words in a vocabulary.
+   constexpr int num_words{ 128 };
 
 #ifdef PRJ_DEBUG
    constexpr bool debug{ true };
@@ -49,12 +56,20 @@ namespace prj
    template<typename T>
    struct Rect
    {
+      /********** CONSTRUCTORS **********/
       static constexpr int fields{ 4 }; // Number of fields.
       constexpr Rect() = default;
       constexpr Rect(const T px, const T py, const T pw, const T ph) :
          x{ px }, y{ py }, w{ pw }, h{ ph } {}
-      constexpr Rect(std::array<T, fields> data) :
+      constexpr explicit Rect(std::array<T, fields> data) :
          x{ data[0] }, y{ data[1] }, w{ data[2] }, h{ data[3] } {}
+
+      /********** METHODS **********/
+      // Check whether a point is inside the rectangle or not.
+      [[nodiscard]] constexpr bool isInside(T ptX, T ptY) const
+      {
+         return (ptX >= x && ptX <= x + w && ptY >= y && ptY <= y + h);
+      }
 
       // Position of the top-left vertex.
       T x{};
@@ -76,6 +91,15 @@ namespace prj
          bgr,
          hsv
       };
+      // Drawable shapes.
+      enum class Shape
+      {
+         rect
+      };
+
+      /********** CONSTANTS **********/
+      // Thickness of a line wrt the smallest image dimension.
+      static constexpr float thickness_coeff{ 0.0025F };
 
       /********** CONSTRUCTORS **********/
       Image() = default;
@@ -101,6 +125,8 @@ namespace prj
       [[nodiscard]] float contrast();
       // Change the data type used for each channel.
       void convert(int type);
+      // Draw a shape onto the image.
+      void draw(Shape shape, const std::vector<cv::Point>& pts, cv::Scalar colour);
       // Dilate the image.
       void dilate(cv::Mat kernel);
       // Display the image.
@@ -117,6 +143,8 @@ namespace prj
       void gaussianFilter(cv::Size size, double sigma);
       // Get the current colour space of the image.
       [[nodiscard]] ColourSpace getColourSpace() const;
+      // Get a rectangle for each segment of the image.
+      [[nodiscard]] std::vector<Rect<int>> getRegions() const;
       // Get the stored image.
       [[nodiscard]] const cv::Mat& image() const;
       // Get the image labels.
@@ -299,6 +327,10 @@ namespace prj
       std::vector<int> trckBarVals_;          // Values of the trackbars.
       bool             trckModified_{ true }; // True if trackbar values changed since the last fetch.
    };
+
+   /********** FUNCTIONS **********/
+   cv::Mat getTree(const cv::Mat& mat, Rect<int> tree, std::pair<float, float> scale);
+
 } // namespace prj
 
 #endif

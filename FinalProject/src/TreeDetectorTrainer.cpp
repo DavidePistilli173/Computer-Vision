@@ -8,7 +8,7 @@
 
 using namespace prj;
 
-const cv::Size         TreeDetectorTrainer::img_size{ 500, 500 };
+const cv::Size         TreeDetectorTrainer::img_size{ 1000, 1000 };
 const cv::TermCriteria TreeDetectorTrainer::cluster_criteria{
    cv::TermCriteria::Type::COUNT,
    TreeDetectorTrainer::num_cluster_iter,
@@ -34,6 +34,9 @@ bool TreeDetectorTrainer::train(std::string_view cfgFile, std::string_view imgFo
    Log::info("Clustering features.");
    buildVocabulary_();
 
+   Log::info("Computing average tree histogram.");
+   buildHistogram_(imgFolder);
+
    std::string outputFile{ imgFolder };
    outputFile += output_file;
    Log::info("Saving results to %s.", outputFile.c_str());
@@ -46,16 +49,68 @@ bool TreeDetectorTrainer::train(std::string_view cfgFile, std::string_view imgFo
    return true;
 }
 
+void TreeDetectorTrainer::buildHistogram_(std::string_view folder)
+{
+   auto sift = cv::xfeatures2d::SIFT::create(num_features);
+   auto matcher = cv::BFMatcher::create(cv::NORM_L2);
+
+   avgHistogram_ = cv::Mat::zeros(num_words, 1, CV_32F);
+
+   cv::BOWImgDescriptorExtractor bowExtractor{ sift, matcher };
+   bowExtractor.setVocabulary(clusters_);
+
+   int count{ 0 };
+   for (const auto& image : trainingData_)
+   {
+      if (!image.trees.empty())
+      {
+         Log::info("Computing histogram for image %s.", image.file.c_str());
+         cv::String path{ folder.data() + image.file };
+         cv::Mat    mat{ cv::imread(path) };
+         if (mat.empty())
+         {
+            Log::error("Failed to open image %s.", image.file.c_str());
+         }
+         else
+         {
+            std::pair scalingFactor{
+               static_cast<float>(mat.cols) / img_size.width,
+               static_cast<float>(mat.rows) / img_size.height
+            };
+            cv::resize(mat, mat, img_size);
+            for (const auto& tree : image.trees)
+            {
+               ++count;
+               std::vector<cv::KeyPoint>     keypoints;
+               cv::Mat                       descriptor;
+               std::vector<std::vector<int>> currentHistogram;
+
+               cv::Mat treeImg{ getTree(mat, tree, scalingFactor) };
+               sift->detect(treeImg, keypoints);
+               bowExtractor.compute(treeImg, keypoints, descriptor, &currentHistogram);
+
+               for (int i = 0; i < num_words; ++i)
+               {
+                  avgHistogram_.at<float>(i) += currentHistogram[i].size();
+               }
+            }
+         }
+      }
+   }
+   avgHistogram_ /= count;
+   cv::normalize(avgHistogram_, avgHistogram_, 1.0, 0.0, cv::NORM_L1);
+}
+
 void TreeDetectorTrainer::buildVocabulary_()
 {
-   cv::BOWKMeansTrainer trainer{ num_features, cluster_criteria };
+   cv::BOWKMeansTrainer trainer{ num_words, cluster_criteria };
 
    // Add all descriptors to the trainer.
    for (const auto& image : trainingData_)
    {
-      for (const auto& tree : image.features)
+      for (const auto& trees : image.features)
       {
-         trainer.add(tree);
+         trainer.add(trees);
       }
    }
 
@@ -118,13 +173,7 @@ void TreeDetectorTrainer::extractFeatures_(std::string_view folder, std::atomic<
             for (const auto& tree : trainingData_[i].trees)
             {
                ++count;
-               cv::Mat treeImg{ mat(
-                  cv::Range{
-                     cvRound(tree.y / scalingFactor.second),
-                     cvRound((tree.y + tree.h) / scalingFactor.second) },
-                  cv::Range{
-                     cvRound(tree.x / scalingFactor.first),
-                     cvRound((tree.x + tree.w) / scalingFactor.first) }) };
+               cv::Mat treeImg{ getTree(mat, tree, scalingFactor) };
 
                std::vector<cv::KeyPoint> keypoints;
                cv::Mat&                  descriptors = trainingData_[i].features.emplace_back();
@@ -177,14 +226,14 @@ bool TreeDetectorTrainer::parse_(std::string_view cfgFile)
 
 bool TreeDetectorTrainer::save_(std::string_view file)
 {
-   std::ofstream output(file.data());
-   if (!output.is_open())
+   cv::FileStorage output(file.data(), cv::FileStorage::WRITE);
+   if (!output.isOpened())
    {
       Log::error("Failed to open file %s.", file.data());
       return false;
    }
-
-   output << clusters_;
+   output << xml_words.data() << clusters_;
+   output << xml_hist.data() << avgHistogram_;
 
    return true;
 }

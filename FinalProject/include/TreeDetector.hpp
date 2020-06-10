@@ -35,10 +35,12 @@ namespace prj
       };
 
       /********** CONSTANTS **********/
-      static const cv::Size analysis_res; // Resolution used to analyse the image.
+      static constexpr double score_th{ 0.5 }; // Score threshold for histogram comparison.
+      static const cv::Size   analysis_res;    // Resolution used to analyse the image.
+      static const cv::Scalar tree_colour;     // Colour of the tree box.
 
       /********** CONSTRUCTOR **********/
-      TreeDetector() = default;
+      TreeDetector(std::string_view bowFile);
 
       /********** METHODS **********/
       // Detect trees and output the result.
@@ -54,8 +56,13 @@ namespace prj
       bool preProcess_(std::array<param, static_cast<int>(PParam::tot)>& params);
 
       /********** VARIABLES **********/
-      Image resizedInput_; // Resized input image.
-      Image result_;       // Final result.
+      cv::Mat                 bow_;                 // Bag of words vocabulary.
+      cv::Mat                 avgHist_;             // Average tree word histogram.
+      Image                   resizedInput_;        // Resized input image.
+      std::vector<Image>      processedImgs_;       // Images after pre-processing.
+      Image                   result_;              // Final result.
+      std::vector<Rect<int>>  trees_;               // Final trees in the image.
+      std::pair<float, float> scale_{ 1.0F, 1.0F }; // Scaling factor of the image.
    };
 } // namespace prj
 

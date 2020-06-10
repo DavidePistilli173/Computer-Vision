@@ -26,9 +26,8 @@ namespace prj
       static constexpr std::string_view file_token{ "FILE" };
       // Separator for rectangle data.
       static constexpr std::string_view int_separator{ "," };
-      static constexpr std::string_view output_file{ "trees.dat" };
-      // Number of features for each tree.
-      static constexpr int num_features{ 1000 };
+      // Name of the output file.
+      static constexpr std::string_view output_file{ "trees.xml" };
       // Size required to normalise all images.
       static const cv::Size img_size;
       // Terminating criteria for the kmeans clustering.
@@ -45,6 +44,8 @@ namespace prj
 
    private:
       /********** METHODS **********/
+      // Build the average word histogram of a tree.
+      void buildHistogram_(std::string_view folder);
       // Build the bag of words vocabulary.
       void buildVocabulary_();
       // Compute features for all trees in the dataset.
@@ -60,6 +61,7 @@ namespace prj
       std::vector<TreeImage> trainingData_; // Training input and partial output.
       std::atomic<size_t>    index_{ 0 };   // Thread-safe index.
       cv::Mat                clusters_;     // Feature clusters.
+      cv::Mat                avgHistogram_; // Average tree word histogram.
    };
 } // namespace prj
 

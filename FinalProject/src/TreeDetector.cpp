@@ -1,17 +1,34 @@
 #include "TreeDetector.hpp"
 
 #include <opencv2/imgproc.hpp>
+#include <opencv2/xfeatures2d.hpp>
 #include <thread>
 
 using namespace prj;
 
-const cv::Size TreeDetector::analysis_res{ 500, 500 };
+const cv::Size   TreeDetector::analysis_res{ 1000, 1000 };
+const cv::Scalar TreeDetector::tree_colour{ 0, 0, 255 };
+
+TreeDetector::TreeDetector(std::string_view bowFile)
+{
+   cv::FileStorage input{ bowFile.data(), cv::FileStorage::READ };
+   if (!input.isOpened())
+   {
+      Log::error("Failed to open data file %s.", bowFile.data());
+      throw std::exception();
+   }
+
+   input[xml_words.data()] >> bow_;
+   input[xml_hist.data()] >> avgHist_;
+}
 
 cv::Mat TreeDetector::detect(const cv::Mat& input)
 {
+   result_ = input;
+
    Log::info("Resizing image.");
    // Used to convert tree coordinates back to the input's coordinate frame.
-   std::pair scalingFactor{
+   scale_ = {
       static_cast<float>(input.cols) / analysis_res.width,
       static_cast<float>(input.rows) / analysis_res.height
    };
@@ -56,11 +73,78 @@ cv::Mat TreeDetector::detect(const cv::Mat& input)
 
 bool TreeDetector::analyse_(std::array<param, static_cast<int>(AParam::tot)>& params)
 {
+   // Extract regions from the preprocessed images.
+   Log::info("Extracting relevant image regions.");
+   std::vector<std::vector<Rect<int>>> regions;
+   for (const auto& img : processedImgs_)
+   {
+      regions.emplace_back(img.getRegions());
+   }
+
+   auto sift = cv::xfeatures2d::SIFT::create(num_features);
+   auto matcher = cv::BFMatcher::create(cv::NORM_L2);
+
+   cv::BOWImgDescriptorExtractor bowExtractor{ sift, matcher };
+   bowExtractor.setVocabulary(bow_);
+
+   Log::info("Checking histograms.");
+   for (const auto& img : regions)
+   {
+      for (const auto& region : img)
+      {
+         cv::Mat treeImg{ getTree(resizedInput_.image(), region, std::pair{ 1.0F, 1.0F }) };
+
+         std::vector<cv::KeyPoint>     keypoints;
+         cv::Mat                       descriptor;
+         std::vector<std::vector<int>> currentHistogram;
+
+         sift->detect(treeImg, keypoints);
+
+         if (keypoints.size() > 0)
+         {
+            bowExtractor.compute(treeImg, keypoints, descriptor, &currentHistogram);
+
+            cv::Mat hist{ cv::Mat::zeros(num_words, 1, CV_32F) };
+            for (int i = 0; i < num_words; ++i)
+            {
+               hist.at<float>(i) += currentHistogram[i].size();
+            }
+            cv::normalize(hist, hist, 1.0, 0.0, cv::NORM_L1);
+
+            double distance{ cv::compareHist(avgHist_, hist, cv::HISTCMP_BHATTACHARYYA) };
+            Log::info_d("Score %f.", distance);
+            if (distance < score_th)
+            {
+               Log::info_d(
+                  "Tree detected: (%d, %d, %d, %d) with score %f.",
+                  region.x,
+                  region.y,
+                  region.w,
+                  region.h,
+                  distance);
+               trees_.emplace_back(region);
+            }
+         }
+      }
+   }
+
    return true;
 }
 
 bool TreeDetector::drawResult_()
 {
+   for (const auto& tree : trees_)
+   {
+      cv::Point pt1{ cvRound(tree.x * scale_.first), cvRound(tree.y * scale_.second) };
+      cv::Point pt2{
+         cvRound((tree.x + tree.w) * scale_.first),
+         cvRound((tree.y + tree.h) * scale_.second)
+      };
+      result_.draw(
+         Image::Shape::rect,
+         { pt1, pt2 },
+         tree_colour);
+   }
    return true;
 }
 
@@ -93,11 +177,13 @@ bool TreeDetector::preProcess_(std::array<param, static_cast<int>(PParam::tot)>&
       std::get<double>(params[static_cast<int>(PParam::canny_th2)]),
       std::get<double>(params[static_cast<int>(PParam::dist_th)]));
 
-   std::thread t1{ [filteredImg]() { filteredImg.display("Not equalised", true); } };
-   std::thread t2{ [equalisedFilteredImg]() { equalisedFilteredImg.display("Equalised", true); } };
-   resizedInput_.display(std::string_view{ "Input" });
-   t1.join();
-   t2.join();
+   if constexpr (debug) resizedInput_.display();
+   if constexpr (debug) filteredImg.display(true);
+   if constexpr (debug) equalisedFilteredImg.display(true);
+
+   processedImgs_.reserve(2);
+   processedImgs_.emplace_back(filteredImg);
+   processedImgs_.emplace_back(equalisedFilteredImg);
 
    return true;
 }

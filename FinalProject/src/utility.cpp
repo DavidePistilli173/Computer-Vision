@@ -182,6 +182,17 @@ void Image::convert(int type)
    mat_ = result;
 }
 
+void Image::draw(Shape shape, const std::vector<cv::Point>& pts, cv::Scalar colour)
+{
+   int thickness{ static_cast<int>(std::min(mat_.rows, mat_.cols) * thickness_coeff) };
+   switch (shape)
+   {
+   case Shape::rect:
+      cv::rectangle(mat_, pts[0], pts[1], colour, thickness);
+      break;
+   }
+}
+
 void Image::dilate(cv::Mat kernel)
 {
    cv::dilate(mat_, mat_, kernel);
@@ -209,11 +220,11 @@ void Image::display(std::string_view winName, bool useLabels) const
       {
          for (int j = 0; j < mat_.cols; ++j)
          {
-            if (labels_.at<int>(i, j) != -1)
+            if (int currentLabel{ labels_.at<int>(i, j) }; currentLabel != -1)
             {
-               if (size_t prevSize{ colours.size() }; colours.size() <= labels_.at<int>(i, j))
+               if (size_t prevSize{ colours.size() }; colours.size() <= currentLabel)
                {
-                  colours.resize(labels_.at<int>(i, j) + 1);
+                  colours.resize(currentLabel + 1);
                   for (; prevSize < colours.size(); ++prevSize)
                   {
                      colours[prevSize] = {
@@ -223,7 +234,7 @@ void Image::display(std::string_view winName, bool useLabels) const
                      };
                   }
                }
-               result.at<cv::Vec3b>(i, j) = colours[labels_.at<int>(i, j)];
+               result.at<cv::Vec3b>(i, j) = colours[currentLabel];
             }
          }
       }
@@ -275,6 +286,61 @@ void Image::gaussianFilter(cv::Size size, double sigma)
 Image::ColourSpace Image::getColourSpace() const
 {
    return colSpace_;
+}
+
+std::vector<Rect<int>> Image::getRegions() const
+{
+   std::vector<Rect<int>> result;
+   std::vector<int>       ids;
+
+   // Scan the entire label image.
+   for (int y = 0; y < labels_.rows; ++y)
+   {
+      for (int x = 0; x < labels_.cols; ++x)
+      {
+         if (int currentLabel{ labels_.at<int>(y, x) }; currentLabel != -1)
+         {
+            auto currentId = std::find(ids.begin(), ids.end(), currentLabel);
+            // If the current label is new, add it.
+            if (currentId == ids.end())
+            {
+               ids.emplace_back(currentLabel);
+               result.emplace_back(x, y, 1, 1);
+            }
+            // Otherwise update the rectangle.
+            else
+            {
+               long long index{ std::distance(ids.begin(), currentId) };
+               if (!result[index].isInside(x, y))
+               {
+                  // Update x and w.
+                  if (x < result[index].x)
+                  {
+                     result[index].w += (result[index].x - x);
+                     result[index].x = x;
+                  }
+                  else if (int maxX{ result[index].x + result[index].w }; x > maxX)
+                  {
+                     result[index].w += (x - maxX);
+                  }
+
+                  // Update y and h.
+                  if (y < result[index].y)
+                  {
+                     result[index].h += (result[index].y - y);
+                     result[index].y = y;
+                  }
+                  else if (int maxY{ result[index].y + result[index].h }; y > maxY)
+                  {
+                     result[index].h += (y - maxY);
+                  }
+               }
+            }
+         }
+      }
+   }
+
+   return result;
 }
 
 const cv::Mat& Image::image() const
@@ -411,4 +477,15 @@ void Image::equaliseHSV_()
    cv::equalizeHist(channels[static_cast<int>(HSV::v)], channels[static_cast<int>(HSV::v)]);
 
    cv::merge(channels, mat_);
+}
+
+cv::Mat prj::getTree(const cv::Mat& mat, Rect<int> tree, std::pair<float, float> scale)
+{
+   return mat(
+      cv::Range{
+         cvRound(tree.y / scale.second),
+         cvRound((tree.y + tree.h) / scale.second) },
+      cv::Range{
+         cvRound(tree.x / scale.first),
+         cvRound((tree.x + tree.w) / scale.first) });
 }
