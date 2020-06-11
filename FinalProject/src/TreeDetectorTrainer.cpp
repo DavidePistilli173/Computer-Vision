@@ -8,7 +8,7 @@
 
 using namespace prj;
 
-const cv::Size         TreeDetectorTrainer::img_size{ 1000, 1000 };
+const cv::Size         TreeDetectorTrainer::img_size{ img_width, img_height };
 const cv::TermCriteria TreeDetectorTrainer::cluster_criteria{
    cv::TermCriteria::Type::COUNT,
    TreeDetectorTrainer::num_cluster_iter,

@@ -6,7 +6,7 @@
 
 using namespace prj;
 
-const cv::Size   TreeDetector::analysis_res{ 1000, 1000 };
+const cv::Size   TreeDetector::analysis_res{ img_width, img_height };
 const cv::Scalar TreeDetector::tree_colour{ 0, 0, 255 };
 
 TreeDetector::TreeDetector(std::string_view bowFile)
@@ -39,13 +39,12 @@ cv::Mat TreeDetector::detect(const cv::Mat& input)
    std::array<param, static_cast<int>(PParam::tot)> pParams{
       cv::Size{ 9, 9 },
       3.5,
-      29,
-      100.0,
-      100.0,
-      0.076F,
+      9,
+      150.0,
+      50.0,
       30.0,
       60.0,
-      0.45
+      0.75
    };
    if (!preProcess_(pParams))
    {
@@ -73,13 +72,7 @@ cv::Mat TreeDetector::detect(const cv::Mat& input)
 
 bool TreeDetector::analyse_(std::array<param, static_cast<int>(AParam::tot)>& params)
 {
-   // Extract regions from the preprocessed images.
-   Log::info("Extracting relevant image regions.");
-   std::vector<std::vector<Rect<int>>> regions;
-   for (const auto& img : processedImgs_)
-   {
-      regions.emplace_back(img.getRegions(Image::RegionType::label));
-   }
+   using Cell = ImagePyramid<pyr_children, pyr_depth>::Cell;
 
    auto sift = cv::xfeatures2d::SIFT::create(num_features);
    auto matcher = cv::BFMatcher::create(cv::NORM_L2);
@@ -87,46 +80,74 @@ bool TreeDetector::analyse_(std::array<param, static_cast<int>(AParam::tot)>& pa
    cv::BOWImgDescriptorExtractor bowExtractor{ sift, matcher };
    bowExtractor.setVocabulary(bow_);
 
-   Log::info("Checking histograms.");
-   for (const auto& img : regions)
-   {
-      for (const auto& region : img)
+   // Scan all cells for trees.
+   auto preliminaryAnalysis = [this, &sift, &matcher, &bowExtractor](Cell* cell) {
+      cv::Mat treeImg{ getTree(resizedInput_.image(), cell->rect, std::pair{ 1.0F, 1.0F }) };
+
+      std::vector<cv::KeyPoint>     keypoints;
+      cv::Mat                       descriptor;
+      std::vector<std::vector<int>> currentHistogram;
+
+      sift->detect(treeImg, keypoints);
+
+      if (!keypoints.empty())
       {
-         cv::Mat treeImg{ getTree(resizedInput_.image(), region, std::pair{ 1.0F, 1.0F }) };
+         bowExtractor.compute(treeImg, keypoints, descriptor, &currentHistogram);
 
-         std::vector<cv::KeyPoint>     keypoints;
-         cv::Mat                       descriptor;
-         std::vector<std::vector<int>> currentHistogram;
-
-         sift->detect(treeImg, keypoints);
-
-         if (keypoints.size() > 0)
+         // Compute the BOW normalised histogram.
+         cv::Mat hist{ cv::Mat::zeros(num_words, 1, CV_32F) };
+         for (int i = 0; i < num_words; ++i)
          {
-            bowExtractor.compute(treeImg, keypoints, descriptor, &currentHistogram);
+            hist.at<float>(i) += currentHistogram[i].size();
+         }
+         cv::normalize(hist, hist, 1.0, 0.0, cv::NORM_L1);
 
-            cv::Mat hist{ cv::Mat::zeros(num_words, 1, CV_32F) };
-            for (int i = 0; i < num_words; ++i)
-            {
-               hist.at<float>(i) += currentHistogram[i].size();
-            }
-            cv::normalize(hist, hist, 1.0, 0.0, cv::NORM_L1);
-
-            double distance{ cv::compareHist(avgHist_, hist, cv::HISTCMP_BHATTACHARYYA) };
-            Log::info_d("Score %f.", distance);
-            if (distance < score_th)
-            {
-               Log::info_d(
-                  "Tree detected: (%d, %d, %d, %d) with score %f.",
-                  region.x,
-                  region.y,
-                  region.w,
-                  region.h,
-                  distance);
-               trees_.emplace_back(region);
-            }
+         // Check whether the histogram represents a tree or not.
+         double distance{ cv::compareHist(avgHist_, hist, cv::HISTCMP_BHATTACHARYYA) };
+         if (distance < score_th)
+         {
+            Log::info_d(
+               "Tree detected: (%d, %d, %d, %d) with score %f.",
+               cell->rect.x,
+               cell->rect.y,
+               cell->rect.w,
+               cell->rect.h,
+               distance);
+            cell->tree = true;
          }
       }
-   }
+   };
+   pyramid_.visit(preliminaryAnalysis);
+
+   // Label the highest trees in the pyramid.
+   auto confirm = [](Cell* cell) {
+      // If the cell is a leaf.
+      if (cell->children[0][0] == nullptr)
+      {
+         cell->confirmed = cell->tree;
+         return;
+      }
+
+      if (cell->tree)
+      {
+         int confirmed{ 0 };
+         for (const auto& row : cell->children)
+         {
+            for (const auto& child : row)
+            {
+               if (child->confirmed) ++confirmed;
+            }
+         }
+
+         if (confirmed >= pyr_children - 1) cell->confirmed = true;
+      }
+   };
+   pyramid_.visit(confirm);
+
+   // Get the final candidate trees.
+   addCandidateTrees_(pyramid_.root());
+
+   trees_ = preliminaryTrees_;
 
    return true;
 }
@@ -150,41 +171,25 @@ bool TreeDetector::drawResult_()
 
 bool TreeDetector::preProcess_(std::array<param, static_cast<int>(PParam::tot)>& params)
 {
-   Image filteredImg{ resizedInput_ };
-   if constexpr (debug) filteredImg.display();
-
-   filteredImg.gaussianFilter(
-      std::get<cv::Size>(params[static_cast<int>(PParam::gauss_size)]),
-      std::get<double>(params[static_cast<int>(PParam::gauss_sig)]));
-
-   filteredImg.bilateralFilter(
-      std::get<int>(params[static_cast<int>(PParam::bil_size)]),
-      std::get<double>(params[static_cast<int>(PParam::bil_col_sig)]),
-      std::get<double>(params[static_cast<int>(PParam::bil_space_sig)]));
-
-   if constexpr (debug) filteredImg.display();
-
-   Image equalisedFilteredImg{ filteredImg };
-
-   filteredImg.segment(
-      std::get<double>(params[static_cast<int>(PParam::canny_th1)]),
-      std::get<double>(params[static_cast<int>(PParam::canny_th2)]),
-      std::get<double>(params[static_cast<int>(PParam::dist_th)]));
-
-   equalisedFilteredImg.equaliseHistogram();
-
-   equalisedFilteredImg.segment(
-      std::get<double>(params[static_cast<int>(PParam::canny_th1)]),
-      std::get<double>(params[static_cast<int>(PParam::canny_th2)]),
-      std::get<double>(params[static_cast<int>(PParam::dist_th)]));
-
-   if constexpr (debug) resizedInput_.display();
-   if constexpr (debug) filteredImg.display(Image::RegionType::label);
-   if constexpr (debug) equalisedFilteredImg.display(Image::RegionType::label);
-
-   processedImgs_.reserve(2);
-   processedImgs_.emplace_back(filteredImg);
-   processedImgs_.emplace_back(equalisedFilteredImg);
-
    return true;
+}
+
+void TreeDetector::addCandidateTrees_(ImagePyramid<pyr_children, pyr_depth>::Cell* node)
+{
+   if (node == nullptr) return;
+
+   if (node->confirmed)
+   {
+      preliminaryTrees_.emplace_back(node->rect);
+      return;
+   }
+
+   if (node->tree) preliminaryTrees_.emplace_back(node->rect);
+   for (const auto& row : node->children)
+   {
+      for (const auto& child : row)
+      {
+         addCandidateTrees_(child.get());
+      }
+   }
 }

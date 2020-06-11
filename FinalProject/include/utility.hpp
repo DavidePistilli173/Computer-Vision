@@ -2,12 +2,14 @@
 #define PRJ_UTILITY_HPP
 
 #include <cstdio>
+#include <memory>
 #include <mutex>
 #include <opencv2/core.hpp>
 #include <opencv2/highgui.hpp>
 #include <opencv2/xfeatures2d.hpp>
 #include <string_view>
 #include <thread>
+#include <type_traits>
 #include <variant>
 #include <vector>
 
@@ -25,6 +27,9 @@ namespace prj
    constexpr int num_features{ 1000 };
    // Number of words in a vocabulary.
    constexpr int num_words{ 128 };
+   // Image dimensions.
+   constexpr int img_width{ 1000 };
+   constexpr int img_height{ 1000 };
 
 #ifdef PRJ_DEBUG
    constexpr bool debug{ true };
@@ -79,6 +84,40 @@ namespace prj
       T w{};
       T h{};
    };
+
+   /********** FUNCTIONS **********/
+   // Get an image portion described by a scaled rectangle.
+   cv::Mat getTree(const cv::Mat& mat, Rect<int> tree, std::pair<float, float> scale);
+
+   // Constexpr power.
+   template<typename T>
+   constexpr T pow(T base, T exp)
+   {
+      static_assert(std::is_integral<T>::value);
+      if (exp == 0) return 1;
+      if (exp == 1) return base;
+      return base * pow(base, exp - 1);
+   }
+
+   template<typename T>
+   constexpr T sqrt_helper(T x, T lo, T hi)
+   {
+      if (lo == hi)
+         return lo;
+
+      const T mid = (lo + hi + 1) / 2;
+
+      if (x / mid < mid)
+         return sqrt_helper<T>(x, lo, mid - 1);
+      else
+         return sqrt_helper(x, mid, hi);
+   }
+
+   template<typename T>
+   constexpr T ct_sqrt(T x)
+   {
+      return sqrt_helper<T>(x, 0, x / 2 + 1);
+   }
 
    /********** CLASSES **********/
    class Image
@@ -306,6 +345,97 @@ namespace prj
       static std::mutex mtx_;
    };
 
+   // Quad-tree used to segment an image.
+   template<int Children, int Depth>
+   class ImagePyramid
+   {
+   public:
+      // Single grid cell.
+      struct Cell
+      {
+         Rect<int> rect;               // Position and size of the cell.
+         bool      tree{ false };      // True if the BOW analysis detects a tree.
+         bool      confirmed{ false }; // True if a further analysis confirms a tree.
+
+         // Children of the cell.
+         std::array<std::array<std::unique_ptr<Cell>, ct_sqrt(Children)>, ct_sqrt(Children)> children{ nullptr };
+      };
+
+      /********** CONSTANTS **********/
+      static constexpr int side_elems{ ct_sqrt(Children) };
+
+      /********** CONSTRUCTOR **********/
+      ImagePyramid(int imgWidth, int imgHeight)
+      {
+         static_assert(Depth > 0);
+
+         root_.rect = Rect<int>(0, 0, imgWidth - 1, imgHeight - 1);
+         buildTree_(&root_, 1);
+      }
+
+      /********** METHODS **********/
+      template<typename Callable>
+      void visit(Callable func)
+      {
+         visitTree_(func, &root_, 1);
+      }
+
+      Cell* root()
+      {
+         return &root_;
+      }
+
+   private:
+      /********** METHODS **********/
+      void buildTree_(Cell* root, int lvl)
+      {
+         if (lvl == Depth) return;
+
+         int cellWidth{ root->rect.w / side_elems };
+         int cellHeight{ root->rect.h / side_elems };
+         for (int row = 0; row < side_elems; ++row)
+         {
+            for (int col = 0; col < side_elems; ++col)
+            {
+               root->children[row][col] = std::make_unique<Cell>();
+               auto rect = Rect<int>(
+                  (col * root->rect.w) / side_elems,
+                  (row * root->rect.h) / side_elems,
+                  cellWidth,
+                  cellHeight);
+
+               int maxX{ rect.x + rect.w };
+               int maxY{ rect.y + rect.h };
+               if (maxX >= root->rect.w) rect.w -= root->rect.w - maxX + 1;
+               if (maxY >= root->rect.h) rect.h -= root->rect.h - maxY + 1;
+               root->children[row][col]->rect = rect;
+
+               buildTree_(root->children[row][col].get(), lvl + 1);
+            }
+         }
+      }
+
+      template<typename Callable>
+      void visitTree_(Callable func, Cell* node, int lvl)
+      {
+         if (node->children[0][0] != nullptr)
+         {
+            for (auto& row : node->children)
+            {
+               for (auto& child : row)
+               {
+                  visitTree_(func, child.get(), lvl + 1);
+               }
+            }
+         }
+         func(node);
+      }
+
+      /********** VARIABLES **********/
+      // Root of the tree.
+      Cell root_;
+   };
+
    // Basic wrapper for OpenCV windows.
    class Window
    {
@@ -344,10 +474,6 @@ namespace prj
       std::vector<int> trckBarVals_;          // Values of the trackbars.
       bool             trckModified_{ true }; // True if trackbar values changed since the last fetch.
    };
-
-   /********** FUNCTIONS **********/
-   cv::Mat getTree(const cv::Mat& mat, Rect<int> tree, std::pair<float, float> scale);
-
 } // namespace prj
 
 #endif

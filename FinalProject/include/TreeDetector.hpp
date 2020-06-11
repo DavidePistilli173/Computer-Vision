@@ -22,7 +22,6 @@ namespace prj
          bil_size,      // Size of the bilateral filter.
          bil_col_sig,   // Colour sigma of the bilateral filter.
          bil_space_sig, // Space sigma of the bilateral filter.
-         eq_th,         // Equalisation threshold.
          canny_th1,     // Threshold 1 for Canny.
          canny_th2,     // Threshold 2 for Canny.
          dist_th,       // Threshold for the distance transform result.
@@ -35,9 +34,11 @@ namespace prj
       };
 
       /********** CONSTANTS **********/
-      static constexpr double score_th{ 0.5 }; // Score threshold for histogram comparison.
-      static const cv::Size   analysis_res;    // Resolution used to analyse the image.
-      static const cv::Scalar tree_colour;     // Colour of the tree box.
+      static constexpr double score_th{ 0.5 };   // Score threshold for histogram comparison.
+      static const cv::Size   analysis_res;      // Resolution used to analyse the image.
+      static const cv::Scalar tree_colour;       // Colour of the tree box.
+      static constexpr int    pyr_children{ 4 }; // Number of children per cell.
+      static constexpr int    pyr_depth{ 4 };    // Depth of the analysis grid.
 
       /********** CONSTRUCTOR **********/
       explicit TreeDetector(std::string_view bowFile);
@@ -54,15 +55,19 @@ namespace prj
       bool drawResult_();
       // Preprocess the input image.
       bool preProcess_(std::array<param, static_cast<int>(PParam::tot)>& params);
+      // Add all candidate trees in the subtree that starts from node.
+      void addCandidateTrees_(ImagePyramid<pyr_children, pyr_depth>::Cell* node);
 
       /********** VARIABLES **********/
-      cv::Mat                 bow_;                 // Bag of words vocabulary.
-      cv::Mat                 avgHist_;             // Average tree word histogram.
-      Image                   resizedInput_;        // Resized input image.
-      std::vector<Image>      processedImgs_;       // Images after pre-processing.
-      Image                   result_;              // Final result.
-      std::vector<Rect<int>>  trees_;               // Final trees in the image.
-      std::pair<float, float> scale_{ 1.0F, 1.0F }; // Scaling factor of the image.
+      cv::Mat                               bow_;                              // Bag of words vocabulary.
+      cv::Mat                               avgHist_;                          // Average tree word histogram.
+      Image                                 resizedInput_;                     // Resized input image.
+      std::vector<Image>                    processedImgs_;                    // Images after pre-processing.
+      Image                                 result_;                           // Final result.
+      std::vector<Rect<int>>                preliminaryTrees_;                 // All regions containing trees.
+      std::vector<Rect<int>>                trees_;                            // Final trees in the image.
+      std::pair<float, float>               scale_{ 1.0F, 1.0F };              // Scaling factor of the image.
+      ImagePyramid<pyr_children, pyr_depth> pyramid_{ img_width, img_height }; // Analysis grid.
    };
 } // namespace prj
 
