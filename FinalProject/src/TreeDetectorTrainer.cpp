@@ -51,62 +51,35 @@ bool TreeDetectorTrainer::train(std::string_view cfgFile, std::string_view imgFo
 
 void TreeDetectorTrainer::buildHistogram_(std::string_view folder)
 {
-   auto sift = cv::xfeatures2d::SIFT::create(num_features);
-   auto matcher = cv::BFMatcher::create(cv::NORM_L2);
+   avgTreeHist_.first = cv::Mat::zeros(num_words, 1, CV_32F);
+   avgNonTreeHist_.first = cv::Mat::zeros(num_words, 1, CV_32F);
 
-   avgTreeHist_ = cv::Mat::zeros(num_words, 1, CV_32F);
-   avgNonTreeHist_ = cv::Mat::zeros(num_words, 1, CV_32F);
+   std::atomic<size_t> treeCount{ 0 };    // Total amount of trees processed.
+   std::atomic<size_t> nonTreeCount{ 0 }; // Total amount of non-tree cells processed.
+   index_ = 0;                            // Reset the training data index.
 
-   cv::BOWImgDescriptorExtractor bowExtractor{ sift, matcher };
-   bowExtractor.setVocabulary(clusters_);
+   unsigned int num_threads{ std::thread::hardware_concurrency() };
+   num_threads = std::max(1U, num_threads);
+   Log::info_d("Running on %d threads.", num_threads);
 
-   int treeCount{ 0 };
-   int nonTreeCount{ 0 };
-   for (const auto& image : trainingData_)
+   std::vector<std::thread> threads;
+   threads.reserve(num_threads);
+   for (int i = 0; i < num_threads; ++i)
    {
-      Log::info("Computing histogram for image %s.", image.file.c_str());
-      cv::String path{ folder.data() + image.file };
-      Image      img{ cv::imread(path) };
-      if (img.empty())
-      {
-         Log::error("Failed to open image %s.", image.file.c_str());
-         continue;
-      }
-
-      // Preprocessing.
-      std::pair scalingFactor{
-         static_cast<float>(img.image().cols) / img_size.width,
-         static_cast<float>(img.image().rows) / img_size.height
-      };
-      img.resize(img_size);
-      img.equaliseHistogram();
-
-      // If there are trees in the image.
-      if (!image.trees.empty())
-      {
-         for (const auto& tree : image.trees)
-         {
-            if (updateHistogram_(avgTreeHist_, sift, bowExtractor, img, tree, scalingFactor))
-               ++treeCount;
-         }
-      }
-      // If there are not trees in the image.
-      else
-      {
-         using Cell = decltype(pyramid_)::Cell;
-
-         auto computeHist = [this, &img, sift, &bowExtractor, &nonTreeCount, &scalingFactor](const Cell* node) {
-            if (updateHistogram_(avgNonTreeHist_, sift, bowExtractor, img, node->rect, scalingFactor))
-               ++nonTreeCount;
-         };
-         pyramid_.visit(computeHist);
-      }
+      threads.emplace_back(
+         std::thread([this, folder, &treeCount, &nonTreeCount]() {
+            this->histogramWorker_(folder, treeCount, nonTreeCount);
+         }));
+   }
+   for (auto& thread : threads)
+   {
+      thread.join();
    }
 
-   avgTreeHist_ /= treeCount;
-   cv::normalize(avgTreeHist_, avgTreeHist_, 1.0, 0.0, cv::NORM_L1);
-   avgNonTreeHist_ /= nonTreeCount;
-   cv::normalize(avgNonTreeHist_, avgNonTreeHist_, 1.0, 0.0, cv::NORM_L1);
+   avgTreeHist_.first /= treeCount;
+   cv::normalize(avgTreeHist_.first, avgTreeHist_.first, 1.0, 0.0, cv::NORM_L1);
+   avgNonTreeHist_.first /= nonTreeCount;
+   cv::normalize(avgNonTreeHist_.first, avgNonTreeHist_.first, 1.0, 0.0, cv::NORM_L1);
 }
 
 void TreeDetectorTrainer::buildVocabulary_()
@@ -221,6 +194,59 @@ void TreeDetectorTrainer::extractFeatures_(
    }
 }
 
+void TreeDetectorTrainer::histogramWorker_(
+   std::string_view     folder,
+   std::atomic<size_t>& treeCount,
+   std::atomic<size_t>& nonTreeCount)
+{
+   auto sift = cv::xfeatures2d::SIFT::create(num_features);
+   auto matcher = cv::BFMatcher::create(cv::NORM_L2);
+
+   cv::BOWImgDescriptorExtractor bowExtractor{ sift, matcher };
+   bowExtractor.setVocabulary(clusters_);
+
+   for (size_t i = index_++; i < trainingData_.size(); i = index_++)
+   {
+      Log::info("Computing histogram for image %s.", trainingData_[i].file.c_str());
+      cv::String path{ folder.data() + trainingData_[i].file };
+      Image      img{ cv::imread(path) };
+      if (img.empty())
+      {
+         Log::error("Failed to open image %s.", trainingData_[i].file.c_str());
+         continue;
+      }
+
+      // Preprocessing.
+      std::pair scalingFactor{
+         static_cast<float>(img.image().cols) / img_size.width,
+         static_cast<float>(img.image().rows) / img_size.height
+      };
+      img.resize(img_size);
+      img.equaliseHistogram();
+
+      // If there are trees in the image.
+      if (!trainingData_[i].trees.empty())
+      {
+         for (const auto& tree : trainingData_[i].trees)
+         {
+            if (updateHistogram_(avgTreeHist_, sift, bowExtractor, img, tree, scalingFactor))
+               ++treeCount;
+         }
+      }
+      // If there are not trees in the image.
+      else
+      {
+         using Cell = decltype(pyramid_)::Cell;
+
+         auto computeHist = [this, &img, sift, &bowExtractor, &nonTreeCount, &scalingFactor](const Cell* node) {
+            if (updateHistogram_(avgNonTreeHist_, sift, bowExtractor, img, node->rect, scalingFactor))
+               ++nonTreeCount;
+         };
+         pyramid_.visit(computeHist);
+      }
+   }
+}
+
 bool TreeDetectorTrainer::parse_(std::string_view cfgFile)
 {
    std::ifstream dataset{ cfgFile.data() };
@@ -270,14 +296,14 @@ bool TreeDetectorTrainer::save_(std::string_view file)
       return false;
    }
    output << xml_words.data() << clusters_;
-   output << xml_tree_hist.data() << avgTreeHist_;
-   output << xml_nontree_hist.data() << avgNonTreeHist_;
+   output << xml_tree_hist.data() << avgTreeHist_.first;
+   output << xml_nontree_hist.data() << avgNonTreeHist_.first;
 
    return true;
 }
 
 bool prj::TreeDetectorTrainer::updateHistogram_(
-   cv::Mat&                       hist,
+   Histogram&                     hist,
    cv::Ptr<cv::xfeatures2d::SIFT> sift,
    cv::BOWImgDescriptorExtractor& bowExtractor,
    const Image&                   img,
@@ -295,9 +321,10 @@ bool prj::TreeDetectorTrainer::updateHistogram_(
       std::vector<std::vector<int>> currentHistogram;
       bowExtractor.compute(mat, keypoints, descriptor, &currentHistogram);
 
+      std::scoped_lock lck{ hist.second };
       for (int i = 0; i < num_words; ++i)
       {
-         hist.at<float>(i) += currentHistogram[i].size();
+         hist.first.at<float>(i) += currentHistogram[i].size();
       }
 
       return true;

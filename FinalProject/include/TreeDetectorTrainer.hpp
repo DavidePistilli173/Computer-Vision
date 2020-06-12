@@ -13,6 +13,8 @@ namespace prj
    class TreeDetectorTrainer
    {
    public:
+      using Histogram = std::pair<cv::Mat, std::mutex>;
+
       // Data about an image of a tree.
       struct TrainingImage
       {
@@ -58,13 +60,18 @@ namespace prj
          std::string_view     folder,
          std::atomic<size_t>& treeCount,
          std::atomic<size_t>& nonTreeCount);
+      // Compute the BOW histogram.
+      void histogramWorker_(
+         std::string_view     folder,
+         std::atomic<size_t>& treeCount,
+         std::atomic<size_t>& nonTreeCount);
       // Parse the configuration file.
       bool parse_(std::string_view cfgFile);
       // Save the current training output.
       bool save_(std::string_view file);
       // Update one of the average histograms.
       bool updateHistogram_(
-         cv::Mat&                       hist,
+         Histogram&                     hist,
          cv::Ptr<cv::xfeatures2d::SIFT> sift,
          cv::BOWImgDescriptorExtractor& bowExtractor,
          const Image&                   img,
@@ -75,8 +82,8 @@ namespace prj
       std::vector<TrainingImage> trainingData_;   // Training input and partial output.
       std::atomic<size_t>        index_{ 0 };     // Thread-safe index.
       cv::Mat                    clusters_;       // Feature clusters.
-      cv::Mat                    avgTreeHist_;    // Average tree word histogram.
-      cv::Mat                    avgNonTreeHist_; // Average non-tree word histogram.
+      Histogram                  avgTreeHist_;    // Average tree word histogram.
+      Histogram                  avgNonTreeHist_; // Average non-tree word histogram.
       // Areas to analyse in images that don't contain trees.
       ImagePyramid<pyr_children, pyr_depth> pyramid_{ img_width, img_height };
    };
