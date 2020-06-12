@@ -203,6 +203,13 @@ void Image::draw(Shape shape, const std::vector<cv::Point>& pts, cv::Scalar colo
    }
 }
 
+void Image::drawText(std::string_view text, cv::Point pt, cv::Scalar colour)
+{
+   double size{ mat_.rows * thickness_coeff };
+   int    thickness{ static_cast<int>(std::min(mat_.rows, mat_.cols) * thickness_coeff) };
+   cv::putText(mat_, text.data(), pt, cv::FONT_HERSHEY_PLAIN, size, colour, thickness);
+}
+
 void Image::dilate(cv::Mat kernel)
 {
    cv::dilate(mat_, mat_, kernel);

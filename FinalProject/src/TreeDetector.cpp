@@ -19,7 +19,8 @@ TreeDetector::TreeDetector(std::string_view bowFile)
    }
 
    input[xml_words.data()] >> bow_;
-   input[xml_tree_hist.data()] >> avgHist_;
+   input[xml_tree_hist.data()] >> avgTreeHist_;
+   input[xml_nontree_hist.data()] >> avgNonTreeHist_;
 }
 
 cv::Mat TreeDetector::detect(const cv::Mat& input)
@@ -74,7 +75,7 @@ bool TreeDetector::analyse_(std::array<param, static_cast<int>(AParam::tot)>& pa
 {
    using Cell = decltype(pyramid_)::Cell;
 
-   auto sift = cv::xfeatures2d::SIFT::create(num_features);
+   auto sift = cv::xfeatures2d::SIFT::create(max_features);
    auto matcher = cv::BFMatcher::create(cv::NORM_L2);
 
    cv::BOWImgDescriptorExtractor bowExtractor{ sift, matcher };
@@ -90,7 +91,7 @@ bool TreeDetector::analyse_(std::array<param, static_cast<int>(AParam::tot)>& pa
 
       sift->detect(treeImg, keypoints);
 
-      if (!keypoints.empty())
+      if (keypoints.size() > min_features)
       {
          bowExtractor.compute(treeImg, keypoints, descriptor, &currentHistogram);
 
@@ -103,8 +104,9 @@ bool TreeDetector::analyse_(std::array<param, static_cast<int>(AParam::tot)>& pa
          cv::normalize(hist, hist, 1.0, 0.0, cv::NORM_L1);
 
          // Check whether the histogram represents a tree or not.
-         double distance{ cv::compareHist(avgHist_, hist, cv::HISTCMP_BHATTACHARYYA) };
-         if (distance < score_th)
+         double treeDistance{ cv::compareHist(avgTreeHist_, hist, cv::HISTCMP_BHATTACHARYYA) };
+         double nonTreeDistance{ cv::compareHist(avgNonTreeHist_, hist, cv::HISTCMP_BHATTACHARYYA) };
+         if (treeDistance < nonTreeDistance)
          {
             Log::info_d(
                "Tree detected: (%d, %d, %d, %d) with score %f.",
@@ -112,7 +114,7 @@ bool TreeDetector::analyse_(std::array<param, static_cast<int>(AParam::tot)>& pa
                cell->rect.y,
                cell->rect.w,
                cell->rect.h,
-               distance);
+               treeDistance);
             cell->tree = true;
          }
       }
@@ -154,6 +156,7 @@ bool TreeDetector::analyse_(std::array<param, static_cast<int>(AParam::tot)>& pa
 
 bool TreeDetector::drawResult_()
 {
+   int i{ 1 };
    for (const auto& tree : trees_)
    {
       cv::Point pt1{ cvRound(tree.x * scale_.first), cvRound(tree.y * scale_.second) };
@@ -165,13 +168,15 @@ bool TreeDetector::drawResult_()
          Image::Shape::rect,
          { pt1, pt2 },
          tree_colour);
+      result_.drawText(std::to_string(i), pt1 + (pt2 - pt1) / 2, tree_colour);
+      ++i;
    }
    return true;
 }
 
 bool TreeDetector::preProcess_(std::array<param, static_cast<int>(PParam::tot)>& params)
 {
-   resizedInput_.equaliseHistogram();
+   //resizedInput_.equaliseHistogram();
    return true;
 }
 

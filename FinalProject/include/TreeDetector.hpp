@@ -60,7 +60,8 @@ namespace prj
 
       /********** VARIABLES **********/
       cv::Mat                               bow_;                              // Bag of words vocabulary.
-      cv::Mat                               avgHist_;                          // Average tree word histogram.
+      cv::Mat                               avgTreeHist_;                      // Average tree word histogram.
+      cv::Mat                               avgNonTreeHist_;                   // Average non-tree word histogram.
       Image                                 resizedInput_;                     // Resized input image.
       std::vector<Image>                    processedImgs_;                    // Images after pre-processing.
       Image                                 result_;                           // Final result.

@@ -25,13 +25,14 @@ namespace prj
    constexpr std::string_view xml_tree_hist{ "Tree" };
    // Tag for non-tree histogram.
    constexpr std::string_view xml_nontree_hist{ "NonTree" };
-   // Number of features for each tree.
-   constexpr int num_features{ 1000 };
+   // Maximum of features for each tree.
+   constexpr int max_features{ 2048 };
+   constexpr int min_features{ 128 };
    // Number of words in a vocabulary.
-   constexpr int num_words{ 128 };
+   constexpr int num_words{ 256 };
    // Image dimensions.
-   constexpr int img_width{ 1000 };
-   constexpr int img_height{ 1000 };
+   constexpr int img_width{ 2048 };
+   constexpr int img_height{ 2048 };
 
 #ifdef PRJ_DEBUG
    constexpr bool debug{ true };
@@ -180,6 +181,8 @@ namespace prj
       void convert(int type);
       // Draw a shape onto the image.
       void draw(Shape shape, const std::vector<cv::Point>& pts, cv::Scalar colour);
+      // Draw text on the image.
+      void drawText(std::string_view text, cv::Point pt, cv::Scalar colour);
       // Dilate the image.
       void dilate(cv::Mat kernel);
       // Display the image.
@@ -403,15 +406,17 @@ namespace prj
             {
                root->children[row][col] = std::make_unique<Cell>();
                auto rect = Rect<int>(
-                  (col * root->rect.w) / side_elems,
-                  (row * root->rect.h) / side_elems,
+                  root->rect.x + (col * root->rect.w) / side_elems,
+                  root->rect.y + (row * root->rect.h) / side_elems,
                   cellWidth,
                   cellHeight);
 
                int maxX{ rect.x + rect.w };
                int maxY{ rect.y + rect.h };
-               if (maxX >= root->rect.w) rect.w -= root->rect.w - maxX + 1;
-               if (maxY >= root->rect.h) rect.h -= root->rect.h - maxY + 1;
+               int maxRootX{ root->rect.x + root->rect.w };
+               int maxRootY{ root->rect.y + root->rect.h };
+               if (maxX >= maxRootX) rect.w -= maxRootX - maxX + 1;
+               if (maxY >= maxRootY) rect.h -= maxRootY - maxY + 1;
                root->children[row][col]->rect = rect;
 
                buildTree_(root->children[row][col].get(), lvl + 1);

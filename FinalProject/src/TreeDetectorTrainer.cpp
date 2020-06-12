@@ -144,7 +144,7 @@ void TreeDetectorTrainer::extractFeatures_(
    std::atomic<size_t>& treeCount,
    std::atomic<size_t>& nonTreeCount)
 {
-   auto sift = cv::xfeatures2d::SIFT::create(num_features);
+   auto sift = cv::xfeatures2d::SIFT::create(max_features);
    for (size_t i = index_++; i < trainingData_.size(); i = index_++)
    {
       // Open the image if possible, otherwise skip it.
@@ -157,7 +157,7 @@ void TreeDetectorTrainer::extractFeatures_(
       }
 
       // Image pre-processing.
-      img.equaliseHistogram();
+      //img.equaliseHistogram();
       std::pair scalingFactor{
          static_cast<float>(img.image().cols) / img_size.width,
          static_cast<float>(img.image().rows) / img_size.height
@@ -181,8 +181,8 @@ void TreeDetectorTrainer::extractFeatures_(
       else
       {
          using Cell = decltype(pyramid_)::Cell;
-         auto analyseCell = [this, sift, &img, scalingFactor, &nonTreeCount, i](const Cell* node) {
-            cv::Mat cellImg{ getTree(img.image(), node->rect, scalingFactor) };
+         auto analyseCell = [this, sift, &img, &nonTreeCount, i](const Cell* node) {
+            cv::Mat cellImg{ getTree(img.image(), node->rect, std::pair{ 1.0F, 1.0F }) };
 
             std::vector<cv::KeyPoint> keypoints;
             cv::Mat&                  descriptors = trainingData_[i].features.emplace_back();
@@ -199,7 +199,7 @@ void TreeDetectorTrainer::histogramWorker_(
    std::atomic<size_t>& treeCount,
    std::atomic<size_t>& nonTreeCount)
 {
-   auto sift = cv::xfeatures2d::SIFT::create(num_features);
+   auto sift = cv::xfeatures2d::SIFT::create(max_features);
    auto matcher = cv::BFMatcher::create(cv::NORM_L2);
 
    cv::BOWImgDescriptorExtractor bowExtractor{ sift, matcher };
@@ -222,7 +222,7 @@ void TreeDetectorTrainer::histogramWorker_(
          static_cast<float>(img.image().rows) / img_size.height
       };
       img.resize(img_size);
-      img.equaliseHistogram();
+      //img.equaliseHistogram();
 
       // If there are trees in the image.
       if (!trainingData_[i].trees.empty())
@@ -238,8 +238,8 @@ void TreeDetectorTrainer::histogramWorker_(
       {
          using Cell = decltype(pyramid_)::Cell;
 
-         auto computeHist = [this, &img, sift, &bowExtractor, &nonTreeCount, &scalingFactor](const Cell* node) {
-            if (updateHistogram_(avgNonTreeHist_, sift, bowExtractor, img, node->rect, scalingFactor))
+         auto computeHist = [this, &img, sift, &bowExtractor, &nonTreeCount](const Cell* node) {
+            if (updateHistogram_(avgNonTreeHist_, sift, bowExtractor, img, node->rect, std::pair{ 1.0F, 1.0F }))
                ++nonTreeCount;
          };
          pyramid_.visit(computeHist);
@@ -315,7 +315,7 @@ bool prj::TreeDetectorTrainer::updateHistogram_(
    cv::Mat mat{ getTree(img.image(), rect, scalingFactor) };
    sift->detect(mat, keypoints);
 
-   if (!keypoints.empty())
+   if (keypoints.size() >= min_features)
    {
       cv::Mat                       descriptor;
       std::vector<std::vector<int>> currentHistogram;
