@@ -241,6 +241,11 @@ void Image::distanceTransform()
    cv::distanceTransform(mat_, mat_, cv::DIST_L2, cv::DIST_MASK_5);
 }
 
+bool prj::Image::empty() const
+{
+   return mat_.empty();
+}
+
 void Image::erode(cv::Mat kernel)
 {
    cv::erode(mat_, mat_, kernel);

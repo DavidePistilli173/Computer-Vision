@@ -54,51 +54,59 @@ void TreeDetectorTrainer::buildHistogram_(std::string_view folder)
    auto sift = cv::xfeatures2d::SIFT::create(num_features);
    auto matcher = cv::BFMatcher::create(cv::NORM_L2);
 
-   avgHistogram_ = cv::Mat::zeros(num_words, 1, CV_32F);
+   avgTreeHist_ = cv::Mat::zeros(num_words, 1, CV_32F);
+   avgNonTreeHist_ = cv::Mat::zeros(num_words, 1, CV_32F);
 
    cv::BOWImgDescriptorExtractor bowExtractor{ sift, matcher };
    bowExtractor.setVocabulary(clusters_);
 
-   int count{ 0 };
+   int treeCount{ 0 };
+   int nonTreeCount{ 0 };
    for (const auto& image : trainingData_)
    {
+      Log::info("Computing histogram for image %s.", image.file.c_str());
+      cv::String path{ folder.data() + image.file };
+      Image      img{ cv::imread(path) };
+      if (img.empty())
+      {
+         Log::error("Failed to open image %s.", image.file.c_str());
+         continue;
+      }
+
+      // Preprocessing.
+      std::pair scalingFactor{
+         static_cast<float>(img.image().cols) / img_size.width,
+         static_cast<float>(img.image().rows) / img_size.height
+      };
+      img.resize(img_size);
+      img.equaliseHistogram();
+
+      // If there are trees in the image.
       if (!image.trees.empty())
       {
-         Log::info("Computing histogram for image %s.", image.file.c_str());
-         cv::String path{ folder.data() + image.file };
-         cv::Mat    mat{ cv::imread(path) };
-         if (mat.empty())
+         for (const auto& tree : image.trees)
          {
-            Log::error("Failed to open image %s.", image.file.c_str());
-         }
-         else
-         {
-            std::pair scalingFactor{
-               static_cast<float>(mat.cols) / img_size.width,
-               static_cast<float>(mat.rows) / img_size.height
-            };
-            cv::resize(mat, mat, img_size);
-            for (const auto& tree : image.trees)
-            {
-               ++count;
-               std::vector<cv::KeyPoint>     keypoints;
-               cv::Mat                       descriptor;
-               std::vector<std::vector<int>> currentHistogram;
-
-               cv::Mat treeImg{ getTree(mat, tree, scalingFactor) };
-               sift->detect(treeImg, keypoints);
-               bowExtractor.compute(treeImg, keypoints, descriptor, &currentHistogram);
-
-               for (int i = 0; i < num_words; ++i)
-               {
-                  avgHistogram_.at<float>(i) += currentHistogram[i].size();
-               }
-            }
+            if (updateHistogram_(avgTreeHist_, sift, bowExtractor, img, tree, scalingFactor))
+               ++treeCount;
          }
       }
+      // If there are not trees in the image.
+      else
+      {
+         using Cell = decltype(pyramid_)::Cell;
+
+         auto computeHist = [this, &img, sift, &bowExtractor, &nonTreeCount, &scalingFactor](const Cell* node) {
+            if (updateHistogram_(avgNonTreeHist_, sift, bowExtractor, img, node->rect, scalingFactor))
+               ++nonTreeCount;
+         };
+         pyramid_.visit(computeHist);
+      }
    }
-   avgHistogram_ /= count;
-   cv::normalize(avgHistogram_, avgHistogram_, 1.0, 0.0, cv::NORM_L1);
+
+   avgTreeHist_ /= treeCount;
+   cv::normalize(avgTreeHist_, avgTreeHist_, 1.0, 0.0, cv::NORM_L1);
+   avgNonTreeHist_ /= nonTreeCount;
+   cv::normalize(avgNonTreeHist_, avgNonTreeHist_, 1.0, 0.0, cv::NORM_L1);
 }
 
 void TreeDetectorTrainer::buildVocabulary_()
@@ -108,9 +116,9 @@ void TreeDetectorTrainer::buildVocabulary_()
    // Add all descriptors to the trainer.
    for (const auto& image : trainingData_)
    {
-      for (const auto& trees : image.features)
+      for (const auto& featureSet : image.features)
       {
-         trainer.add(trees);
+         if (!featureSet.empty()) trainer.add(featureSet);
       }
    }
 
@@ -120,8 +128,9 @@ void TreeDetectorTrainer::buildVocabulary_()
 
 bool TreeDetectorTrainer::compute_(std::string_view folder)
 {
-   std::atomic<size_t> count{ 0 }; // Total amount of trees processed.
-   index_ = 0;                     // Reset the training data index.
+   std::atomic<size_t> treeCount{ 0 };    // Total amount of trees processed.
+   std::atomic<size_t> nonTreeCount{ 0 }; // Total amount of non-tree cells processed.
+   index_ = 0;                            // Reset the training data index.
 
    unsigned int num_threads{ std::thread::hardware_concurrency() };
    num_threads = std::max(1U, num_threads);
@@ -132,54 +141,82 @@ bool TreeDetectorTrainer::compute_(std::string_view folder)
    for (int i = 0; i < num_threads; ++i)
    {
       threads.emplace_back(
-         std::thread([this, folder, &count]() { this->extractFeatures_(folder, count); }));
+         std::thread([this, folder, &treeCount, &nonTreeCount]() {
+            this->extractFeatures_(folder, treeCount, nonTreeCount);
+         }));
    }
    for (auto& thread : threads)
    {
       thread.join();
    }
 
-   if (count == 0)
+   if (treeCount == 0)
    {
-      Log::error("No features computed.");
+      Log::error("No tree features computed.");
+      return false;
+   }
+   if (nonTreeCount == 0)
+   {
+      Log::error("No non-tree features computed.");
       return false;
    }
 
-   Log::info("Computed features on %d trees.", count.load());
+   Log::info("Computed features on %d trees.", treeCount.load());
+   Log::info("Computed features on %d non-tree cells.", nonTreeCount.load());
    return true;
 }
 
-void TreeDetectorTrainer::extractFeatures_(std::string_view folder, std::atomic<size_t>& count)
+void TreeDetectorTrainer::extractFeatures_(
+   std::string_view     folder,
+   std::atomic<size_t>& treeCount,
+   std::atomic<size_t>& nonTreeCount)
 {
    auto sift = cv::xfeatures2d::SIFT::create(num_features);
    for (size_t i = index_++; i < trainingData_.size(); i = index_++)
    {
+      // Open the image if possible, otherwise skip it.
+      cv::String path{ folder.data() + trainingData_[i].file };
+      Image      img{ cv::imread(path) };
+      if (img.empty())
+      {
+         Log::warn("Failed to open image %s.", path.c_str());
+         continue;
+      }
+
+      // Image pre-processing.
+      img.equaliseHistogram();
+      std::pair scalingFactor{
+         static_cast<float>(img.image().cols) / img_size.width,
+         static_cast<float>(img.image().rows) / img_size.height
+      };
+      img.resize(img_size);
+
+      Log::info("Computing features on image %s.", trainingData_[i].file.c_str());
+      // If there are trees in the image
       if (!trainingData_[i].trees.empty())
       {
-         cv::String path{ folder.data() + trainingData_[i].file };
-         cv::Mat    mat{ cv::imread(path) };
-         if (mat.empty())
+         for (const auto& tree : trainingData_[i].trees)
          {
-            Log::warn("Failed to open image %s.", path.c_str());
-         }
-         else
-         {
-            Log::info("Computing features on image %s.", trainingData_[i].file.c_str());
-            std::pair scalingFactor{
-               static_cast<float>(mat.cols) / img_size.width,
-               static_cast<float>(mat.rows) / img_size.height
-            };
-            cv::resize(mat, mat, img_size);
-            for (const auto& tree : trainingData_[i].trees)
-            {
-               ++count;
-               cv::Mat treeImg{ getTree(mat, tree, scalingFactor) };
+            cv::Mat treeImg{ getTree(img.image(), tree, scalingFactor) };
 
-               std::vector<cv::KeyPoint> keypoints;
-               cv::Mat&                  descriptors = trainingData_[i].features.emplace_back();
-               sift->detectAndCompute(treeImg, cv::Mat{}, keypoints, descriptors);
-            }
+            std::vector<cv::KeyPoint> keypoints;
+            cv::Mat&                  descriptors = trainingData_[i].features.emplace_back();
+            sift->detectAndCompute(treeImg, cv::Mat{}, keypoints, descriptors);
+            if (!keypoints.empty()) ++treeCount;
          }
+      }
+      else
+      {
+         using Cell = decltype(pyramid_)::Cell;
+         auto analyseCell = [this, sift, &img, scalingFactor, &nonTreeCount, i](const Cell* node) {
+            cv::Mat cellImg{ getTree(img.image(), node->rect, scalingFactor) };
+
+            std::vector<cv::KeyPoint> keypoints;
+            cv::Mat&                  descriptors = trainingData_[i].features.emplace_back();
+            sift->detectAndCompute(cellImg, cv::Mat{}, keypoints, descriptors);
+            if (!keypoints.empty()) ++nonTreeCount;
+         };
+         pyramid_.visit(analyseCell);
       }
    }
 }
@@ -202,7 +239,7 @@ bool TreeDetectorTrainer::parse_(std::string_view cfgFile)
       if (size_t token{ line.find(file_token) }; token != std::string::npos)
       {
          ++i;
-         TreeImage image{};
+         TrainingImage image{};
          image.file = line.substr(token + file_token.size() + 1, line.size());
          Log::info_d("Adding image %s.", image.file.c_str());
          trainingData_.emplace_back(std::move(image));
@@ -233,7 +270,38 @@ bool TreeDetectorTrainer::save_(std::string_view file)
       return false;
    }
    output << xml_words.data() << clusters_;
-   output << xml_hist.data() << avgHistogram_;
+   output << xml_tree_hist.data() << avgTreeHist_;
+   output << xml_nontree_hist.data() << avgNonTreeHist_;
 
    return true;
+}
+
+bool prj::TreeDetectorTrainer::updateHistogram_(
+   cv::Mat&                       hist,
+   cv::Ptr<cv::xfeatures2d::SIFT> sift,
+   cv::BOWImgDescriptorExtractor& bowExtractor,
+   const Image&                   img,
+   Rect<int>                      rect,
+   std::pair<float, float>        scalingFactor)
+{
+   std::vector<cv::KeyPoint> keypoints;
+
+   cv::Mat mat{ getTree(img.image(), rect, scalingFactor) };
+   sift->detect(mat, keypoints);
+
+   if (!keypoints.empty())
+   {
+      cv::Mat                       descriptor;
+      std::vector<std::vector<int>> currentHistogram;
+      bowExtractor.compute(mat, keypoints, descriptor, &currentHistogram);
+
+      for (int i = 0; i < num_words; ++i)
+      {
+         hist.at<float>(i) += currentHistogram[i].size();
+      }
+
+      return true;
+   }
+
+   return false;
 }

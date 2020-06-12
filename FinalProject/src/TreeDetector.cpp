@@ -19,7 +19,7 @@ TreeDetector::TreeDetector(std::string_view bowFile)
    }
 
    input[xml_words.data()] >> bow_;
-   input[xml_hist.data()] >> avgHist_;
+   input[xml_tree_hist.data()] >> avgHist_;
 }
 
 cv::Mat TreeDetector::detect(const cv::Mat& input)
@@ -72,7 +72,7 @@ cv::Mat TreeDetector::detect(const cv::Mat& input)
 
 bool TreeDetector::analyse_(std::array<param, static_cast<int>(AParam::tot)>& params)
 {
-   using Cell = ImagePyramid<pyr_children, pyr_depth>::Cell;
+   using Cell = decltype(pyramid_)::Cell;
 
    auto sift = cv::xfeatures2d::SIFT::create(num_features);
    auto matcher = cv::BFMatcher::create(cv::NORM_L2);
@@ -171,6 +171,7 @@ bool TreeDetector::drawResult_()
 
 bool TreeDetector::preProcess_(std::array<param, static_cast<int>(PParam::tot)>& params)
 {
+   resizedInput_.equaliseHistogram();
    return true;
 }
 

@@ -14,7 +14,7 @@ namespace prj
    {
    public:
       // Data about an image of a tree.
-      struct TreeImage
+      struct TrainingImage
       {
          cv::String             file;     // Name of the file containing the image.
          std::vector<Rect<int>> trees;    // List of trees in the image.
@@ -30,6 +30,9 @@ namespace prj
       static constexpr std::string_view output_file{ "trees.xml" };
       // Size required to normalise all images.
       static const cv::Size img_size;
+      // Image pyramid constants for non-tree analysis.
+      static constexpr int pyr_depth{ 2 };
+      static constexpr int pyr_children{ 4 };
       // Terminating criteria for the kmeans clustering.
       static const cv::TermCriteria cluster_criteria;
       // Number of clustering iterations.
@@ -51,17 +54,31 @@ namespace prj
       // Compute features for all trees in the dataset.
       bool compute_(std::string_view folder);
       // Extract tree features from the training data.
-      void extractFeatures_(std::string_view folder, std::atomic<size_t>& count);
+      void extractFeatures_(
+         std::string_view     folder,
+         std::atomic<size_t>& treeCount,
+         std::atomic<size_t>& nonTreeCount);
       // Parse the configuration file.
       bool parse_(std::string_view cfgFile);
       // Save the current training output.
       bool save_(std::string_view file);
+      // Update one of the average histograms.
+      bool updateHistogram_(
+         cv::Mat&                       hist,
+         cv::Ptr<cv::xfeatures2d::SIFT> sift,
+         cv::BOWImgDescriptorExtractor& bowExtractor,
+         const Image&                   img,
+         Rect<int>                      rect,
+         std::pair<float, float>        scalingFactor);
 
       /********** VARIABLES **********/
-      std::vector<TreeImage> trainingData_; // Training input and partial output.
-      std::atomic<size_t>    index_{ 0 };   // Thread-safe index.
-      cv::Mat                clusters_;     // Feature clusters.
-      cv::Mat                avgHistogram_; // Average tree word histogram.
+      std::vector<TrainingImage> trainingData_;   // Training input and partial output.
+      std::atomic<size_t>        index_{ 0 };     // Thread-safe index.
+      cv::Mat                    clusters_;       // Feature clusters.
+      cv::Mat                    avgTreeHist_;    // Average tree word histogram.
+      cv::Mat                    avgNonTreeHist_; // Average non-tree word histogram.
+      // Areas to analyse in images that don't contain trees.
+      ImagePyramid<pyr_children, pyr_depth> pyramid_{ img_width, img_height };
    };
 } // namespace prj
 

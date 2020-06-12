@@ -22,7 +22,9 @@ namespace prj
    // Tag for tree words.
    constexpr std::string_view xml_words{ "Words" };
    // Tag for tree histogram.
-   constexpr std::string_view xml_hist{ "histogram" };
+   constexpr std::string_view xml_tree_hist{ "Tree" };
+   // Tag for non-tree histogram.
+   constexpr std::string_view xml_nontree_hist{ "NonTree" };
    // Number of features for each tree.
    constexpr int num_features{ 1000 };
    // Number of words in a vocabulary.
@@ -186,6 +188,8 @@ namespace prj
       void display(std::string_view winName, RegionType type = RegionType::none) const;
       // Compute the distance transform.
       void distanceTransform();
+      // Return true if there is no image stored.
+      [[nodiscard]] bool empty() const;
       // Erode the image.
       void erode(cv::Mat kernel);
       // Equalise the histogram of the image.
