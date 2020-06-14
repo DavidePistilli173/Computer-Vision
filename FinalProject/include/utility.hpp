@@ -2,6 +2,7 @@
 #define PRJ_UTILITY_HPP
 
 #include <cstdio>
+#include <functional>
 #include <memory>
 #include <mutex>
 #include <opencv2/core.hpp>
@@ -72,7 +73,7 @@ namespace prj
       constexpr Rect() = default;
       constexpr Rect(const T px, const T py, const T pw, const T ph) :
          x{ px }, y{ py }, w{ pw }, h{ ph } {}
-      constexpr explicit Rect(std::array<T, fields> data) :
+      constexpr explicit Rect(const std::array<T, fields>& data) :
          x{ data[0] }, y{ data[1] }, w{ data[2] }, h{ data[3] } {}
 
       /********** METHODS **********/
@@ -362,9 +363,17 @@ namespace prj
       // Single grid cell.
       struct Cell
       {
-         Rect<int> rect;               // Position and size of the cell.
-         bool      tree{ false };      // True if the BOW analysis detects a tree.
-         bool      confirmed{ false }; // True if a further analysis confirms a tree.
+         // Cell detection status.
+         enum class Status
+         {
+            tree,     // The cell has a tree.
+            non_tree, // The cell does not have a tree.
+            discard   // This cell and all its parents will be discarded.
+         };
+
+         Rect<int> rect;                       // Position and size of the cell.
+         double    score{ -1.0 };              // If it is positive there is a tree in the cell.
+         Status    status{ Status::non_tree }; // Current staus of the cell.
 
          // Children of the cell.
          std::array<std::array<std::unique_ptr<Cell>, ct_sqrt(Children)>, ct_sqrt(Children)> children{ nullptr };
@@ -439,7 +448,7 @@ namespace prj
                }
             }
          }
-         func(node);
+         std::invoke(func, node);
       }
 
       /********** VARIABLES **********/

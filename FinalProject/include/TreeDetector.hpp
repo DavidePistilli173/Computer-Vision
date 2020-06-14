@@ -39,6 +39,9 @@ namespace prj
       static const cv::Scalar tree_colour;       // Colour of the tree box.
       static constexpr int    pyr_children{ 4 }; // Number of children per cell.
       static constexpr int    pyr_depth{ 4 };    // Depth of the analysis grid.
+      // Score thresholds for confirmed trees.
+      static constexpr double base_threshold{ 0.05 };
+      static constexpr double child_th_coeff{ 0.5 };
 
       /********** CONSTRUCTOR **********/
       TreeDetector() = default;

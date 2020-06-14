@@ -108,14 +108,18 @@ bool TreeDetector::analyse_(std::array<param, static_cast<int>(AParam::tot)>& pa
    nonTreeExtractor.setVocabulary(nonTreeVocabulary_);
 
    // Scan all cells for trees.
-   auto preliminaryAnalysis = [this, &sift, &matcher, &treeExtractor, &nonTreeExtractor](Cell* cell) {
+   auto preliminaryAnalysis = [this, &sift, &treeExtractor, &nonTreeExtractor](Cell* cell) {
       cv::Mat treeImg{ getTree(resizedInput_.image(), cell->rect, std::pair{ 1.0F, 1.0F }) };
 
-      double treeScore{ computeScore(treeExtractor, sift, treeImg, avgTreeHist_) };
-      double nonTreeScore{ computeScore(nonTreeExtractor, sift, treeImg, avgNonTreeHist_) };
+      double treeDist{ computeScore(treeExtractor, sift, treeImg, avgTreeHist_) };
+      double nonTreeDist{ computeScore(nonTreeExtractor, sift, treeImg, avgNonTreeHist_) };
 
       // Check whether the histogram represents a tree or not.
-      if (treeScore >= 0.0 && treeScore < nonTreeScore)
+      if (treeDist < 0)
+         cell->score = treeDist;
+      else
+         cell->score = nonTreeDist - treeDist;
+      if (cell->score > 0)
       {
          Log::info_d(
             "Tree detected: (%d, %d, %d, %d) with score %f.",
@@ -123,8 +127,7 @@ bool TreeDetector::analyse_(std::array<param, static_cast<int>(AParam::tot)>& pa
             cell->rect.y,
             cell->rect.w,
             cell->rect.h,
-            treeScore);
-         cell->tree = true;
+            cell->score);
       }
    };
    pyramid_.visit(preliminaryAnalysis);
@@ -134,22 +137,61 @@ bool TreeDetector::analyse_(std::array<param, static_cast<int>(AParam::tot)>& pa
       // If the cell is a leaf.
       if (cell->children[0][0] == nullptr)
       {
-         cell->confirmed = cell->tree;
+         Log::info_d("Leaf with score %f.", cell->score);
+         if (cell->score > base_threshold)
+         {
+            Log::warn_d(
+               "Tree confirmed.\n  rect: (%d, %d, %d, %d).",
+               cell->rect.x,
+               cell->rect.y,
+               cell->rect.w,
+               cell->rect.h);
+            cell->status = Cell::Status::tree;
+         }
+         else
+            cell->status = Cell::Status::non_tree;
          return;
       }
 
-      if (cell->tree)
+      Log::info_d("Intermediate with score %f.", cell->score);
+      int    confirmedChildren{ 0 };
+      double avgChildrenScore{ 0.0 };
+      for (const auto& row : cell->children)
       {
-         int confirmed{ 0 };
-         for (const auto& row : cell->children)
+         for (const auto& child : row)
          {
-            for (const auto& child : row)
-            {
-               if (child->confirmed) ++confirmed;
-            }
+            if (child->status != Cell::Status::non_tree)
+               ++confirmedChildren;
+            avgChildrenScore += child->score;
          }
+      }
+      avgChildrenScore /= pyr_children;
 
-         if (confirmed >= pyr_children - 1) cell->confirmed = true;
+      if (confirmedChildren > 0)
+         cell->status = Cell::Status::discard;
+      else if (cell->score > 0)
+      {
+         if (
+            cell->score > base_threshold ||
+            (cell->score >= avgChildrenScore && avgChildrenScore > child_th_coeff * cell->score))
+         {
+            cell->status = Cell::Status::tree;
+            Log::warn_d(
+               "Tree confirmed.  rect: (%d, %d, %d, %d)\n  confirmedChildren = %d, score = %f, avgChildrenScore = %f.",
+               cell->rect.x,
+               cell->rect.y,
+               cell->rect.w,
+               cell->rect.h,
+               confirmedChildren,
+               cell->score,
+               avgChildrenScore);
+         }
+         else
+            cell->status = Cell::Status::non_tree;
+      }
+      else
+      {
+         cell->status = Cell::Status::non_tree;
       }
    };
    pyramid_.visit(confirm);
@@ -220,15 +262,16 @@ bool TreeDetector::preProcess_(std::array<param, static_cast<int>(PParam::tot)>&
 
 void TreeDetector::addCandidateTrees_(ImagePyramid<pyr_children, pyr_depth>::Cell* node)
 {
+   using Cell = ImagePyramid<pyr_children, pyr_depth>::Cell;
+
    if (node == nullptr) return;
 
-   if (node->confirmed)
+   if (node->status == Cell::Status::tree)
    {
       preliminaryTrees_.emplace_back(node->rect);
       return;
    }
 
-   if (node->tree) preliminaryTrees_.emplace_back(node->rect);
    for (const auto& row : node->children)
    {
       for (const auto& child : row)
