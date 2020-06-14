@@ -79,11 +79,12 @@ namespace prj
          std::pair<float, float>        scalingFactor);
 
       /********** VARIABLES **********/
-      std::vector<TrainingImage> trainingData_;   // Training input and partial output.
-      std::atomic<size_t>        index_{ 0 };     // Thread-safe index.
-      cv::Mat                    clusters_;       // Feature clusters.
-      Histogram                  avgTreeHist_;    // Average tree word histogram.
-      Histogram                  avgNonTreeHist_; // Average non-tree word histogram.
+      std::vector<TrainingImage> trainingData_;      // Training input and partial output.
+      std::atomic<size_t>        index_{ 0 };        // Thread-safe index.
+      cv::Mat                    treeVocabulary_;    // Clusters of tree features.
+      cv::Mat                    nonTreeVocabulary_; // Clusters of non-tree features.
+      Histogram                  avgTreeHist_;       // Average tree word histogram.
+      Histogram                  avgNonTreeHist_;    // Average non-tree word histogram.
       // Areas to analyse in images that don't contain trees.
       ImagePyramid<pyr_children, pyr_depth> pyramid_{ img_width, img_height };
    };

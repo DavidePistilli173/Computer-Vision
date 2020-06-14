@@ -55,7 +55,17 @@ int main(int argc, char* argv[])
 
       // Initialise the tree detector.
       Log::info("Initialising the tree detector.");
-      prj::TreeDetector td{ argv[static_cast<int>(Arg::file)] };
+
+      prj::TreeDetector td;
+      try
+      {
+         td = prj::TreeDetector(argv[static_cast<int>(Arg::file)]);
+      }
+      catch (std::exception)
+      {
+         Log::fatal("Failed to initialise tree detector.");
+         return 1;
+      }
 
       // Run the tree detector.
       Log::info("Detecting trees.");

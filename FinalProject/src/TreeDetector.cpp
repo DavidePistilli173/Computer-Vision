@@ -18,9 +18,33 @@ TreeDetector::TreeDetector(std::string_view bowFile)
       throw std::exception();
    }
 
-   input[xml_words.data()] >> bow_;
+   input[xml_tree_voc.data()] >> treeVocabulary_;
+   if (treeVocabulary_.empty())
+   {
+      Log::error("Failed to load tree vocabulary.");
+      throw std::exception();
+   }
+
+   input[xml_nontree_voc.data()] >> nonTreeVocabulary_;
+   if (nonTreeVocabulary_.empty())
+   {
+      Log::error("Failed to load non-tree vocabulary.");
+      throw std::exception();
+   }
+
    input[xml_tree_hist.data()] >> avgTreeHist_;
+   if (avgTreeHist_.empty())
+   {
+      Log::error("Failed to load average tree histogram.");
+      throw std::exception();
+   }
+
    input[xml_nontree_hist.data()] >> avgNonTreeHist_;
+   if (avgNonTreeHist_.empty())
+   {
+      Log::error("Failed to load average non-tree histogram.");
+      throw std::exception();
+   }
 }
 
 cv::Mat TreeDetector::detect(const cv::Mat& input)
@@ -78,45 +102,29 @@ bool TreeDetector::analyse_(std::array<param, static_cast<int>(AParam::tot)>& pa
    auto sift = cv::xfeatures2d::SIFT::create(max_features);
    auto matcher = cv::BFMatcher::create(cv::NORM_L2);
 
-   cv::BOWImgDescriptorExtractor bowExtractor{ sift, matcher };
-   bowExtractor.setVocabulary(bow_);
+   cv::BOWImgDescriptorExtractor treeExtractor{ sift, matcher };
+   treeExtractor.setVocabulary(treeVocabulary_);
+   cv::BOWImgDescriptorExtractor nonTreeExtractor{ sift, matcher };
+   nonTreeExtractor.setVocabulary(nonTreeVocabulary_);
 
    // Scan all cells for trees.
-   auto preliminaryAnalysis = [this, &sift, &matcher, &bowExtractor](Cell* cell) {
+   auto preliminaryAnalysis = [this, &sift, &matcher, &treeExtractor, &nonTreeExtractor](Cell* cell) {
       cv::Mat treeImg{ getTree(resizedInput_.image(), cell->rect, std::pair{ 1.0F, 1.0F }) };
 
-      std::vector<cv::KeyPoint>     keypoints;
-      cv::Mat                       descriptor;
-      std::vector<std::vector<int>> currentHistogram;
+      double treeScore{ computeScore(treeExtractor, sift, treeImg, avgTreeHist_) };
+      double nonTreeScore{ computeScore(nonTreeExtractor, sift, treeImg, avgNonTreeHist_) };
 
-      sift->detect(treeImg, keypoints);
-
-      if (keypoints.size() > min_features)
+      // Check whether the histogram represents a tree or not.
+      if (treeScore >= 0.0 && treeScore < nonTreeScore)
       {
-         bowExtractor.compute(treeImg, keypoints, descriptor, &currentHistogram);
-
-         // Compute the BOW normalised histogram.
-         cv::Mat hist{ cv::Mat::zeros(num_words, 1, CV_32F) };
-         for (int i = 0; i < num_words; ++i)
-         {
-            hist.at<float>(i) += currentHistogram[i].size();
-         }
-         cv::normalize(hist, hist, 1.0, 0.0, cv::NORM_L1);
-
-         // Check whether the histogram represents a tree or not.
-         double treeDistance{ cv::compareHist(avgTreeHist_, hist, cv::HISTCMP_BHATTACHARYYA) };
-         double nonTreeDistance{ cv::compareHist(avgNonTreeHist_, hist, cv::HISTCMP_BHATTACHARYYA) };
-         if (treeDistance < nonTreeDistance)
-         {
-            Log::info_d(
-               "Tree detected: (%d, %d, %d, %d) with score %f.",
-               cell->rect.x,
-               cell->rect.y,
-               cell->rect.w,
-               cell->rect.h,
-               treeDistance);
-            cell->tree = true;
-         }
+         Log::info_d(
+            "Tree detected: (%d, %d, %d, %d) with score %f.",
+            cell->rect.x,
+            cell->rect.y,
+            cell->rect.w,
+            cell->rect.h,
+            treeScore);
+         cell->tree = true;
       }
    };
    pyramid_.visit(preliminaryAnalysis);
@@ -152,6 +160,36 @@ bool TreeDetector::analyse_(std::array<param, static_cast<int>(AParam::tot)>& pa
    trees_ = preliminaryTrees_;
 
    return true;
+}
+
+double prj::TreeDetector::computeScore(
+   cv::BOWImgDescriptorExtractor& extractor,
+   cv::Ptr<cv::xfeatures2d::SIFT> sift,
+   const cv::Mat&                 img,
+   const cv::Mat&                 referenceHist)
+{
+   std::vector<cv::KeyPoint>     keypoints;
+   cv::Mat                       descriptor;
+   std::vector<std::vector<int>> currentHistogram;
+
+   sift->detect(img, keypoints);
+
+   if (keypoints.size() > min_features)
+   {
+      extractor.compute(img, keypoints, descriptor, &currentHistogram);
+
+      // Compute the BOW normalised histogram.
+      cv::Mat hist{ cv::Mat::zeros(num_words, 1, CV_32F) };
+      for (int i = 0; i < num_words; ++i)
+      {
+         hist.at<float>(i) += currentHistogram[i].size();
+      }
+      cv::normalize(hist, hist, 1.0, 0.0, cv::NORM_L1);
+
+      return cv::compareHist(referenceHist, hist, cv::HISTCMP_BHATTACHARYYA);
+   }
+
+   return -1.0;
 }
 
 bool TreeDetector::drawResult_()

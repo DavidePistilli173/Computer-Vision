@@ -20,7 +20,9 @@ namespace prj
 
    /********** CONSTANTS **********/
    // Tag for tree words.
-   constexpr std::string_view xml_words{ "Words" };
+   constexpr std::string_view xml_tree_voc{ "TreeVocabulary" };
+   // Tag for non-tree words.
+   constexpr std::string_view xml_nontree_voc{ "NonTreeVocabulary" };
    // Tag for tree histogram.
    constexpr std::string_view xml_tree_hist{ "Tree" };
    // Tag for non-tree histogram.
@@ -29,7 +31,7 @@ namespace prj
    constexpr int max_features{ 2048 };
    constexpr int min_features{ 128 };
    // Number of words in a vocabulary.
-   constexpr int num_words{ 256 };
+   constexpr int num_words{ 128 };
    // Image dimensions.
    constexpr int img_width{ 2048 };
    constexpr int img_height{ 2048 };

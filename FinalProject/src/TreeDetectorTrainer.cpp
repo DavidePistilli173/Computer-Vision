@@ -84,19 +84,35 @@ void TreeDetectorTrainer::buildHistogram_(std::string_view folder)
 
 void TreeDetectorTrainer::buildVocabulary_()
 {
-   cv::BOWKMeansTrainer trainer{ num_words, cluster_criteria };
+   cv::BOWKMeansTrainer treeTrainer{ num_words, cluster_criteria };
+   cv::BOWKMeansTrainer nonTreeTrainer{ num_words, cluster_criteria };
 
-   // Add all descriptors to the trainer.
+   // Add all descriptors to the appropriate trainer.
    for (const auto& image : trainingData_)
    {
-      for (const auto& featureSet : image.features)
+      // If there are trees in the image.
+      if (!image.trees.empty())
       {
-         if (!featureSet.empty()) trainer.add(featureSet);
+         for (const auto& featureSet : image.features)
+         {
+            if (!featureSet.empty()) treeTrainer.add(featureSet);
+         }
+      }
+      // If there are no trees in the image.
+      else
+      {
+         for (const auto& featureSet : image.features)
+         {
+            if (!featureSet.empty()) nonTreeTrainer.add(featureSet);
+         }
       }
    }
 
    // Compute the clusters.
-   clusters_ = trainer.cluster();
+   Log::info("Clustering tree features.");
+   treeVocabulary_ = treeTrainer.cluster();
+   Log::info("Clustering non-tree features.");
+   nonTreeVocabulary_ = nonTreeTrainer.cluster();
 }
 
 bool TreeDetectorTrainer::compute_(std::string_view folder)
@@ -202,8 +218,10 @@ void TreeDetectorTrainer::histogramWorker_(
    auto sift = cv::xfeatures2d::SIFT::create(max_features);
    auto matcher = cv::BFMatcher::create(cv::NORM_L2);
 
-   cv::BOWImgDescriptorExtractor bowExtractor{ sift, matcher };
-   bowExtractor.setVocabulary(clusters_);
+   cv::BOWImgDescriptorExtractor treeExtractor{ sift, matcher };
+   treeExtractor.setVocabulary(treeVocabulary_);
+   cv::BOWImgDescriptorExtractor nonTreeExtractor{ sift, matcher };
+   nonTreeExtractor.setVocabulary(nonTreeVocabulary_);
 
    for (size_t i = index_++; i < trainingData_.size(); i = index_++)
    {
@@ -229,17 +247,17 @@ void TreeDetectorTrainer::histogramWorker_(
       {
          for (const auto& tree : trainingData_[i].trees)
          {
-            if (updateHistogram_(avgTreeHist_, sift, bowExtractor, img, tree, scalingFactor))
+            if (updateHistogram_(avgTreeHist_, sift, treeExtractor, img, tree, scalingFactor))
                ++treeCount;
          }
       }
-      // If there are not trees in the image.
+      // If there are no trees in the image.
       else
       {
          using Cell = decltype(pyramid_)::Cell;
 
-         auto computeHist = [this, &img, sift, &bowExtractor, &nonTreeCount](const Cell* node) {
-            if (updateHistogram_(avgNonTreeHist_, sift, bowExtractor, img, node->rect, std::pair{ 1.0F, 1.0F }))
+         auto computeHist = [this, &img, sift, &nonTreeExtractor, &nonTreeCount](const Cell* node) {
+            if (updateHistogram_(avgNonTreeHist_, sift, nonTreeExtractor, img, node->rect, std::pair{ 1.0F, 1.0F }))
                ++nonTreeCount;
          };
          pyramid_.visit(computeHist);
@@ -295,7 +313,8 @@ bool TreeDetectorTrainer::save_(std::string_view file)
       Log::error("Failed to open file %s.", file.data());
       return false;
    }
-   output << xml_words.data() << clusters_;
+   output << xml_tree_voc.data() << treeVocabulary_;
+   output << xml_nontree_voc.data() << nonTreeVocabulary_;
    output << xml_tree_hist.data() << avgTreeHist_.first;
    output << xml_nontree_hist.data() << avgNonTreeHist_.first;
 
