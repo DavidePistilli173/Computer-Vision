@@ -30,7 +30,7 @@ namespace prj
    constexpr std::string_view xml_nontree_hist{ "NonTree" };
    // Maximum of features for each tree.
    constexpr int max_features{ 2048 };
-   constexpr int min_features{ 128 };
+   constexpr int min_features{ 256 };
    // Number of words in a vocabulary.
    constexpr int num_words{ 128 };
    // Image dimensions.
@@ -68,6 +68,16 @@ namespace prj
    template<typename T>
    struct Rect
    {
+      // Sides of the rectangle.
+      enum class Side
+      {
+         right,
+         top,
+         left,
+         bottom,
+         tot
+      };
+
       /********** CONSTRUCTORS **********/
       static constexpr int fields{ 4 }; // Number of fields.
       constexpr Rect() = default;
@@ -76,11 +86,146 @@ namespace prj
       constexpr explicit Rect(const std::array<T, fields>& data) :
          x{ data[0] }, y{ data[1] }, w{ data[2] }, h{ data[3] } {}
 
+      /********** OPERATORS **********/
+      bool operator!=(const Rect<T>& other)
+      {
+         return x != other.x || y != other.y || w != other.w || h != other.h;
+      }
+
       /********** METHODS **********/
       // Check whether a point is inside the rectangle or not.
-      [[nodiscard]] constexpr bool isInside(T ptX, T ptY) const
+      [[nodiscard]] constexpr bool contains(const T& ptX, const T& ptY) const
       {
          return (ptX >= x && ptX <= x + w && ptY >= y && ptY <= y + h);
+      }
+      // Check whether another rectangle is inside this one or not.
+      [[nodiscard]] constexpr bool contains(const Rect<T>& rect) const
+      {
+         return rect.x >= x && rect.x + rect.w <= x + w && rect.y >= y && rect.y + rect.h <= y + h;
+      }
+
+      // Extend the rectangle on one side up to a limit.
+      constexpr void extend(Side side, const T& amount, const T& limit)
+      {
+         switch (side)
+         {
+         case Side::right:
+         {
+            w += amount;
+            T diff{ x + w - limit };
+            if (diff > 0) w -= diff;
+            break;
+         }
+         case Side::top:
+         {
+            T newY{ y - amount };
+            if (newY < limit) newY = limit;
+            h += (y - newY);
+            y = newY;
+            break;
+         }
+         case Side::left:
+         {
+            T newX{ x - amount };
+            if (newX < limit) newX = limit;
+            w += (x - newX);
+            x = newX;
+            break;
+         }
+         case Side::bottom:
+         {
+            h += amount;
+            T diff{ y + h - limit };
+            if (diff > 0) h -= diff;
+            break;
+         }
+         default:
+            break;
+         }
+      }
+
+      // Compute the extension rectangle on the specified side.
+      [[nodiscard]] constexpr Rect<T> getExtension(Side side, const T& amount, const T& limit) const
+      {
+         Rect<T> result;
+         switch (side)
+         {
+         case Side::right:
+         {
+            result.x = x + w;
+            result.y = y;
+            result.h = h;
+            result.w = amount;
+            T diff{ result.x + result.w - limit };
+            if (diff > 0) result.w -= diff;
+         }
+         break;
+         case Side::top:
+         {
+            result.x = x;
+            result.w = w;
+            result.y = y - amount;
+            if (result.y < limit) result.y = limit;
+            result.h = y - result.y;
+         }
+         break;
+         case Side::left:
+         {
+            result.y = y;
+            result.h = h;
+            result.x = x - amount;
+            if (result.x < limit) result.x = limit;
+            result.w = x - result.x;
+         }
+         break;
+         case Side::bottom:
+         {
+            result.x = x;
+            result.y = y + h;
+            result.w = w;
+            result.h = result.y + amount;
+            T diff{ result.y + result.h - limit };
+            if (diff > 0) result.h -= diff;
+         }
+         break;
+         default:
+            break;
+         }
+         return result;
+      }
+
+      // Checks whether the current rectangle overlaps a target one by at least ratio * smallest area.
+      [[nodiscard]] constexpr Rect<T> overlaps(const Rect<T>& rect, float ratio)
+      {
+         T thisMaxX{ x + w };
+         T thisMaxY{ y + h };
+         T otherMaxX{ rect.x + rect.w };
+         T otherMaxY{ rect.y + rect.h };
+
+         if (thisMaxX <= rect.x || otherMaxX <= x || thisMaxY <= rect.y || otherMaxY <= y)
+            return Rect<int>(0, 0, 0, 0);
+
+         T thisArea{ w * h };
+         T otherArea{ rect.w * rect.h };
+
+         std::array orderedX{
+            x, thisMaxX, rect.x, otherMaxX
+         };
+         std::sort(orderedX.begin(), orderedX.end());
+         std::array orderedY{
+            y, thisMaxY, rect.y, otherMaxY
+         };
+         std::sort(orderedY.begin(), orderedY.end());
+
+         T overlapW{ orderedX[2] - orderedX[1] };
+         T overlapH{ orderedY[2] - orderedY[1] };
+         T overlapArea{ overlapW * overlapH };
+
+         T minArea{ std::min(thisArea, otherArea) };
+         if (overlapArea >= ratio * minArea)
+            return Rect<T>(orderedX[0], orderedY[0], orderedX[3] - orderedX[0], orderedY[3] - orderedY[0]);
+         else
+            return Rect<T>(0, 0, 0, 0);
       }
 
       // Position of the top-left vertex.
@@ -91,9 +236,22 @@ namespace prj
       T h{};
    };
 
+   struct Tree
+   {
+      constexpr Tree() = default;
+      constexpr Tree(const Rect<int>& newRect, double newScore) :
+         rect{ newRect },
+         score{ newScore } {}
+      Rect<int> rect{ 0, 0, 0, 0 };
+      double    score{ 0.0 };
+   };
+
    /********** FUNCTIONS **********/
    // Get an image portion described by a scaled rectangle.
-   cv::Mat getTree(const cv::Mat& mat, Rect<int> tree, std::pair<float, float> scale);
+   cv::Mat getTree(
+      const cv::Mat&          mat,
+      Rect<int>               tree,
+      std::pair<float, float> scale = std::pair{ 1.0F, 1.0F });
 
    // Constexpr power.
    template<typename T>
@@ -126,6 +284,26 @@ namespace prj
    }
 
    /********** CLASSES **********/
+   class BOWExtractor
+   {
+   public:
+      BOWExtractor() = default;
+
+      // Compute the distance between img and the reference histogram.
+      double computeDist(const cv::Mat& img);
+      // Initialise the BOW extractor.
+      bool initExtractor(cv::Ptr<cv::xfeatures2d::SIFT> sift, cv::Ptr<cv::BFMatcher> matcher);
+      // Set the data to work on.
+      bool setData(const cv::Mat& hist, const cv::Mat& vocab);
+
+   private:
+      cv::Mat                        refHist_; // Reference histogram.
+      cv::Mat                        vocab_;   // Vocabulary,
+      cv::Ptr<cv::xfeatures2d::SIFT> sift_;    // Sift.
+      // BOW extractor.
+      std::unique_ptr<cv::BOWImgDescriptorExtractor> extractor_;
+   };
+
    class Image
    {
    public:
@@ -392,6 +570,16 @@ namespace prj
       }
 
       /********** METHODS **********/
+      int minCellHeight() const
+      {
+         return minCellHeight_;
+      }
+
+      int minCellWidth() const
+      {
+         return minCellWidth_;
+      }
+
       template<typename Callable>
       void visit(Callable func)
       {
@@ -407,7 +595,12 @@ namespace prj
       /********** METHODS **********/
       void buildTree_(Cell* root, int lvl)
       {
-         if (lvl == Depth) return;
+         if (lvl == Depth)
+         {
+            minCellWidth_ = root->rect.w;
+            minCellHeight_ = root->rect.h;
+            return;
+         }
 
          int cellWidth{ root->rect.w / side_elems };
          int cellHeight{ root->rect.h / side_elems };
@@ -454,6 +647,9 @@ namespace prj
       /********** VARIABLES **********/
       // Root of the tree.
       Cell root_;
+      // Minimum size of one cell.
+      int minCellWidth_{ 0 };
+      int minCellHeight_{ 0 };
    };
 
    // Basic wrapper for OpenCV windows.
