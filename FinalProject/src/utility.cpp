@@ -456,9 +456,12 @@ std::vector<Rect<int>> prj::Image::computeBlobRegions_() const
 std::vector<Rect<int>> prj::Image::computeLabelRegions_() const
 {
    std::vector<Rect<int>> result;
-   std::vector<int>       ids;
 
-   // Scan the entire label image.
+   std::vector<int> ids;
+   // Cumulative region parameters used to compute average centre and size.
+   std::vector<std::pair<cv::Point2l, long>> cumulatives;
+
+   // Compute the region centres.
    for (int y = 0; y < labels_.rows; ++y)
    {
       for (int x = 0; x < labels_.cols; ++x)
@@ -470,39 +473,55 @@ std::vector<Rect<int>> prj::Image::computeLabelRegions_() const
             if (currentId == ids.end())
             {
                ids.emplace_back(currentLabel);
-               result.emplace_back(x, y, 1, 1);
+               cumulatives.emplace_back(cv::Point2l{ x, y }, 1);
             }
-            // Otherwise update the rectangle.
+            // Otherwise update the centre.
             else
             {
                long long index{ std::distance(ids.begin(), currentId) };
-               if (!result[index].contains(x, y))
-               {
-                  // Update x and w.
-                  if (x < result[index].x)
-                  {
-                     result[index].w += (result[index].x - x);
-                     result[index].x = x;
-                  }
-                  else if (int maxX{ result[index].x + result[index].w }; x > maxX)
-                  {
-                     result[index].w += (x - maxX);
-                  }
-
-                  // Update y and h.
-                  if (y < result[index].y)
-                  {
-                     result[index].h += (result[index].y - y);
-                     result[index].y = y;
-                  }
-                  else if (int maxY{ result[index].y + result[index].h }; y > maxY)
-                  {
-                     result[index].h += (y - maxY);
-                  }
-               }
+               cumulatives[index].first += cv::Point2l{ x, y };
+               ++cumulatives[index].second;
             }
          }
       }
+   }
+
+   // Compute the average centres.
+   result.reserve(cumulatives.size());
+   for (auto& centre : cumulatives)
+   {
+      centre.first /= centre.second;
+      result.emplace_back(centre.first.x, centre.first.y, 1, 1);
+      centre.first = cv::Point2l{ 0, 0 };
+   }
+
+   // Compute region sizes.
+   for (int y = 0; y < labels_.rows; ++y)
+   {
+      for (int x = 0; x < labels_.cols; ++x)
+      {
+         if (int currentLabel{ labels_.at<int>(y, x) }; currentLabel != -1)
+         {
+            // Update the current region's size.
+            auto      currentId = std::find(ids.begin(), ids.end(), currentLabel);
+            long long index{ std::distance(ids.begin(), currentId) };
+            cumulatives[index].first += cv::Point2l{
+               std::abs(x - result[index].x),
+               std::abs(y - result[index].y)
+            };
+         }
+      }
+   }
+
+   // Compute the average sizes.
+   for (int i = 0; i < cumulatives.size(); ++i)
+   {
+      result[i].w = 2 * cumulatives[i].first.x / cumulatives[i].second;
+      result[i].h = 2 * cumulatives[i].first.y / cumulatives[i].second;
+      int xDiff{ result[i].x + result[i].w - mat_.cols + 1 };
+      int yDiff{ result[i].y + result[i].h - mat_.rows + 1 };
+      if (xDiff > 0) result[i].w -= xDiff;
+      if (yDiff > 0) result[i].h -= yDiff;
    }
 
    return result;

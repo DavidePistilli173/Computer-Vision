@@ -330,7 +330,7 @@ namespace prj
 
       /********** CONSTANTS **********/
       // Thickness of a line wrt the smallest image dimension.
-      static constexpr float thickness_coeff{ 0.0025F };
+      static constexpr float thickness_coeff{ 0.003F };
       // Default drawing colour.
       static const cv::Scalar default_colour;
 

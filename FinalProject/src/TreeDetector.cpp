@@ -102,25 +102,14 @@ cv::Mat TreeDetector::detect(const cv::Mat& input)
    resizedInput_.resize(analysis_res);
 
    Log::info("Preprocessing.");
-   std::array<param, static_cast<int>(PParam::tot)> pParams{
-      cv::Size{ 9, 9 },
-      3.5,
-      9,
-      150.0,
-      50.0,
-      30.0,
-      60.0,
-      0.75
-   };
-   if (!preProcess_(pParams))
+   if (!preProcess_())
    {
       Log::error("Preprocessing failed.");
       return cv::Mat{};
    }
 
    Log::info("Analysing data.");
-   std::array<param, static_cast<int>(AParam::tot)> aParams;
-   if (!analyse_(aParams))
+   if (!analyse_())
    {
       Log::error("Failed to analyse data.");
       return cv::Mat{};
@@ -136,101 +125,25 @@ cv::Mat TreeDetector::detect(const cv::Mat& input)
    return result_.image();
 }
 
-bool TreeDetector::analyse_(std::array<param, static_cast<int>(AParam::tot)>& params)
+bool TreeDetector::analyse_()
 {
-   // Scan all cells for trees.
-   Log::info("Performing prelimiary analysis.");
-   auto preliminaryAnalysis = [this](Cell* cell) {
-      cv::Mat treeImg{ getTree(resizedInput_.image(), cell->rect) };
-
-      double treeDist{ treeExtractor_.computeDist(treeImg) };
-      double nonTreeDist{ nonTreeExtractor_.computeDist(treeImg) };
-
-      cell->score = computeScore_(treeDist, nonTreeDist);
-
-      if (cell->score > 0)
+   Log::info("Choosing most relevant segments.");
+   for (const auto& segment : segments_)
+   {
+      cv::Mat img{ getTree(resizedInput_.image(), segment) };
+      double  treeDist{ treeExtractor_.computeDist(img) };
+      double  nonTreeDist{ nonTreeExtractor_.computeDist(img) };
+      if (treeDist >= 0 || nonTreeDist >= 0)
       {
-         Log::info_d(
-            "Tree detected: (%d, %d, %d, %d) with score %f.",
-            cell->rect.x,
-            cell->rect.y,
-            cell->rect.w,
-            cell->rect.h,
-            cell->score);
-      }
-   };
-   pyramid_.visit(preliminaryAnalysis);
-
-   // Label the highest trees in the pyramid.
-   Log::info("Confirming candidate trees.");
-   auto confirm = [](Cell* cell) {
-      // If the cell is a leaf.
-      if (cell->children[0][0] == nullptr)
-      {
-         Log::info_d("Leaf with score %f.", cell->score);
-         if (cell->score > base_threshold)
+         double score{ computeScore_(treeDist, nonTreeDist) };
+         if (score > base_threshold)
          {
-            Log::warn_d(
-               "Tree confirmed.\n  rect: (%d, %d, %d, %d).",
-               cell->rect.x,
-               cell->rect.y,
-               cell->rect.w,
-               cell->rect.h);
-            cell->status = Cell::Status::tree;
-         }
-         else
-            cell->status = Cell::Status::non_tree;
-         return;
-      }
-
-      Log::info_d("Intermediate with score %f.", cell->score);
-      int    confirmedChildren{ 0 };
-      double avgChildrenScore{ 0.0 };
-      for (const auto& row : cell->children)
-      {
-         for (const auto& child : row)
-         {
-            if (child->status != Cell::Status::non_tree)
-               ++confirmedChildren;
-            avgChildrenScore += child->score;
+            preliminaryTrees_.emplace_back(segment, score);
          }
       }
-      avgChildrenScore /= pyr_children;
+   }
 
-      if (confirmedChildren > 0)
-         cell->status = Cell::Status::discard;
-      else if (cell->score > 0)
-      {
-         if (
-            cell->score > base_threshold ||
-            (cell->score >= avgChildrenScore && avgChildrenScore > child_th_coeff * cell->score))
-         {
-            cell->status = Cell::Status::tree;
-            Log::warn_d(
-               "Tree confirmed.  rect: (%d, %d, %d, %d)\n  confirmedChildren = %d, score = %f, avgChildrenScore = %f.",
-               cell->rect.x,
-               cell->rect.y,
-               cell->rect.w,
-               cell->rect.h,
-               confirmedChildren,
-               cell->score,
-               avgChildrenScore);
-         }
-         else
-            cell->status = Cell::Status::non_tree;
-      }
-      else
-      {
-         cell->status = Cell::Status::non_tree;
-      }
-   };
-   pyramid_.visit(confirm);
-
-   // Get the final candidate trees.
-   addCandidateTrees_(pyramid_.root());
-
-   // Compute the final trees.
-   Log::info("Computing final trees.");
+   Log::info("Combining overlapping candidates.");
    // Sort the preliminary trees by increasing score.
    std::sort(
       preliminaryTrees_.begin(),
@@ -238,6 +151,16 @@ bool TreeDetector::analyse_(std::array<param, static_cast<int>(AParam::tot)>& pa
       [](const auto& left, const auto& right) {
          return left.score > right.score;
       });
+   // Combine overlapping candidates.
+   int i{ 0 };
+   while (i > preliminaryTrees_.size())
+   {
+      i = fuseTrees_(i);
+      ++i;
+   }
+
+   // Compute the final trees.
+   Log::info("Computing final trees.");
    growCandidates_();
 
    // Set the final trees.
@@ -289,6 +212,43 @@ double prj::TreeDetector::extendCell_(
    double  treeDist{ treeExtractor_.computeDist(img) };
    double  nonTreeDist{ nonTreeExtractor_.computeDist(img) };
    return computeScore_(treeDist, nonTreeDist);
+}
+
+int TreeDetector::fuseTrees_(int ref)
+{
+   int j{ 0 };
+   while (j < preliminaryTrees_.size())
+   {
+      if (ref != j)
+      {
+         if (preliminaryTrees_[ref].rect.contains(preliminaryTrees_[j].rect))
+         {
+            auto it = preliminaryTrees_.begin() + j;
+            if (j < ref) --ref;
+            preliminaryTrees_.erase(it);
+         }
+         else
+         {
+            Rect<int> overlapResult{
+               preliminaryTrees_[ref].rect.overlaps(preliminaryTrees_[j].rect, overlap_th)
+            };
+
+            if (overlapResult.w != 0 && overlapResult.h != 0)
+            {
+               preliminaryTrees_[ref].rect = overlapResult;
+               auto it = preliminaryTrees_.begin() + j;
+               if (j < ref) --ref;
+               preliminaryTrees_.erase(it);
+               j = 0;
+            }
+            else
+               ++j;
+         }
+      }
+      else
+         ++j;
+   }
+   return ref;
 }
 
 void TreeDetector::growCandidates_()
@@ -378,45 +338,26 @@ void TreeDetector::growCandidates_()
       }
 
       // Remove regions that have been enveloped.
-      int j{ 0 };
-      while (j < preliminaryTrees_.size())
-      {
-         if (i != j)
-         {
-            if (preliminaryTrees_[i].rect.contains(preliminaryTrees_[j].rect))
-            {
-               auto it = preliminaryTrees_.begin() + j;
-               if (j < i) --i;
-               preliminaryTrees_.erase(it);
-            }
-            else
-            {
-               Rect<int> overlapResult{
-                  preliminaryTrees_[i].rect.overlaps(preliminaryTrees_[j].rect, overlap_th)
-               };
-
-               if (overlapResult.w != 0 && overlapResult.h != 0)
-               {
-                  preliminaryTrees_[i].rect = overlapResult;
-                  auto it = preliminaryTrees_.begin() + j;
-                  if (j < i) --i;
-                  preliminaryTrees_.erase(it);
-                  j = 0;
-               }
-               else
-                  ++j;
-            }
-         }
-         else
-            ++j;
-      }
+      i = fuseTrees_(i);
 
       ++i;
    }
 }
 
-bool TreeDetector::preProcess_(std::array<param, static_cast<int>(PParam::tot)>& params)
+bool TreeDetector::preProcess_()
 {
+   Log::info("Filtering image.");
+   Image processedImage{ resizedInput_ };
+   processedImage.bilateralFilter(9, 150, 50);
+   processedImage.gaussianFilter(cv::Size{ 9, 9 }, 3.5);
+   Log::info("Segmenting image.");
+   processedImage.segment(50, 45, 0.415);
+
+   if constexpr (debug) processedImage.display(Image::RegionType::label);
+
+   Log::info("Retrieving segments.");
+   segments_ = processedImage.getRegions(Image::RegionType::label);
+
    return true;
 }
 

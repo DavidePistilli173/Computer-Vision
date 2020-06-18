@@ -13,26 +13,6 @@ namespace prj
    class TreeDetector
    {
    public:
-      /********** ENUMS **********/
-      // Preprocessing parameters.
-      enum class PParam
-      {
-         gauss_size,    // Size of the Gaussian filter.
-         gauss_sig,     // Sigma of the Gaussian filter.
-         bil_size,      // Size of the bilateral filter.
-         bil_col_sig,   // Colour sigma of the bilateral filter.
-         bil_space_sig, // Space sigma of the bilateral filter.
-         canny_th1,     // Threshold 1 for Canny.
-         canny_th2,     // Threshold 2 for Canny.
-         dist_th,       // Threshold for the distance transform result.
-         tot            // Total number of parameters.
-      };
-      // Analysis parameters.
-      enum class AParam
-      {
-         tot
-      };
-
       /********** CONSTANTS **********/
       static constexpr double score_th{ 0.5 };   // Score threshold for histogram comparison.
       static const cv::Size   analysis_res;      // Resolution used to analyse the image.
@@ -61,7 +41,7 @@ namespace prj
       // Add all candidate trees in the subtree that starts from node.
       void addCandidateTrees_(Cell* node);
       // Analyse the preprocessed data to find trees.
-      bool analyse_(std::array<param, static_cast<int>(AParam::tot)>& params);
+      bool analyse_();
       // Compute the score of an image from the class distances.
       double computeScore_(double treeDist, double nonTreeDist);
       // Draw the final result.
@@ -72,17 +52,19 @@ namespace prj
          Rect<int>::Side side,
          int             amount,
          int             limit);
+      // Combine trees that overlap.
+      int fuseTrees_(int ref);
       // Grow each candidate tree while it improves its score.
       void growCandidates_();
       // Preprocess the input image.
-      bool preProcess_(std::array<param, static_cast<int>(PParam::tot)>& params);
+      bool preProcess_();
 
       /********** VARIABLES **********/
       BOWExtractor                          treeExtractor_;                    // Histogram extractor for trees.
       BOWExtractor                          nonTreeExtractor_;                 // Histogram extractor for non-trees.
       Image                                 resizedInput_;                     // Resized input image.
-      std::vector<Image>                    processedImgs_;                    // Images after pre-processing.
       Image                                 result_;                           // Final result.
+      std::vector<Rect<int>>                segments_;                         // Segmentation result.
       std::vector<Tree>                     preliminaryTrees_;                 // All regions containing trees.
       std::vector<Rect<int>>                trees_;                            // Final trees in the image.
       std::pair<float, float>               scale_{ 1.0F, 1.0F };              // Scaling factor of the image.
