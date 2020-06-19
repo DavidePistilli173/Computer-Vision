@@ -7,6 +7,7 @@
 using namespace prj;
 
 const cv::Scalar Image::default_colour{ 0, 0, 255 };
+const cv::Size   Image::contrast_kernel_size{ 9, 9 };
 
 Image::Image(const cv::Mat& mat) :
    mat_{ mat.clone() },
@@ -64,15 +65,15 @@ Image& Image::operator=(const cv::Mat& mat)
    return *this;
 }
 
-void Image::bilateralFilter(int size, double colour_sig, double space_sig)
+void Image::bilateralFilter(const BilateralFilterParams& params)
 {
    cv::Mat result;
    cv::bilateralFilter(
       mat_,
       result,
-      size,
-      colour_sig,
-      space_sig);
+      params.size,
+      params.colSig,
+      params.spaceSig);
    mat_ = result;
 }
 
@@ -92,12 +93,12 @@ void prj::Image::canny(double th1, double th2)
 void Image::connectedComponents()
 {
    if (mat_.depth() == CV_8U)
-      cv::connectedComponents(mat_, labels_, 8, CV_32S);
+      cv::connectedComponents(mat_, labels_, neighbours, CV_32S);
    else
    {
       cv::Mat mat8U;
       mat_.convertTo(mat8U, CV_8U);
-      cv::connectedComponents(mat8U, labels_, 8, CV_32S);
+      cv::connectedComponents(mat8U, labels_, neighbours, CV_32S);
    }
 }
 
@@ -109,7 +110,7 @@ float Image::contrast()
    std::vector<cv::Mat> channels;
    cv::split(mat_, channels);
 
-   cv::Mat kernel{ cv::Mat::ones(cv::Size{ 9, 9 }, CV_8U) };
+   cv::Mat kernel{ cv::Mat::ones(contrast_kernel_size, CV_8U) };
    Image   min{ channels[static_cast<int>(HSV::v)] };
    Image   max{ channels[static_cast<int>(HSV::v)] };
    min.erode(kernel);
@@ -131,7 +132,7 @@ void Image::convert(int type)
    mat_ = result;
 }
 
-void Image::draw(Shape shape, const std::vector<cv::Point>& pts, cv::Scalar colour)
+void Image::draw(Shape shape, const std::vector<cv::Point>& pts, const cv::Scalar& colour)
 {
    int thickness{ static_cast<int>(std::min(mat_.rows, mat_.cols) * thickness_coeff) };
    switch (shape)
@@ -142,14 +143,14 @@ void Image::draw(Shape shape, const std::vector<cv::Point>& pts, cv::Scalar colo
    }
 }
 
-void Image::drawText(std::string_view text, cv::Point pt, cv::Scalar colour)
+void Image::drawText(std::string_view text, const cv::Point& pt, const cv::Scalar& colour)
 {
    double size{ mat_.rows * thickness_coeff };
    int    thickness{ static_cast<int>(std::min(mat_.rows, mat_.cols) * thickness_coeff) };
    cv::putText(mat_, text.data(), pt, cv::FONT_HERSHEY_PLAIN, size, colour, thickness);
 }
 
-void Image::dilate(cv::Mat kernel)
+void Image::dilate(const cv::Mat& kernel)
 {
    cv::dilate(mat_, mat_, kernel);
 }
@@ -192,7 +193,7 @@ bool prj::Image::empty() const
    return mat_.empty();
 }
 
-void Image::erode(cv::Mat kernel)
+void Image::erode(const cv::Mat& kernel)
 {
    cv::erode(mat_, mat_, kernel);
 }
@@ -215,14 +216,14 @@ void Image::equaliseHistogram()
    }
 }
 
-void Image::gaussianFilter(cv::Size size, double sigma)
+void Image::gaussianFilter(const GaussianFilterParams& params)
 {
    cv::Mat result;
    cv::GaussianBlur(
       mat_,
       result,
-      size,
-      sigma);
+      params.size,
+      params.sigma);
    mat_ = result;
 }
 
@@ -235,14 +236,14 @@ std::vector<Rect<int>> Image::getRegions(RegionType type) const
 {
    switch (type)
    {
-   case RegionType::none:
-      return std::vector<Rect<int>>();
-      break;
    case RegionType::label:
       return computeLabelRegions_();
       break;
    case RegionType::blob:
       return computeBlobRegions_();
+      break;
+   default:
+      return std::vector<Rect<int>>();
       break;
    }
 }
@@ -306,17 +307,17 @@ void Image::resize(const cv::Size& newSize)
    cv::resize(mat_, mat_, newSize);
 }
 
-void Image::segment(double cannyTh1, double cannyTh2, double distTh)
+void Image::segment(const SegmentationParams& params)
 {
    Image edgeMap{ mat_ };
-   edgeMap.canny(cannyTh1, cannyTh2);
+   edgeMap.canny(params.cannyTh1, params.cannyTh2);
    if constexpr (debug) edgeMap.display();
    edgeMap.negative();
    edgeMap.distanceTransform();
    edgeMap.log();
    edgeMap.normalise(0.0, 1.0, cv::NORM_MINMAX);
    if constexpr (debug) edgeMap.display();
-   edgeMap.threshold(distTh, 1.0, cv::THRESH_BINARY);
+   edgeMap.threshold(params.distTh, 1.0, cv::THRESH_BINARY);
    if constexpr (debug) edgeMap.display();
    edgeMap.connectedComponents();
 
@@ -487,7 +488,7 @@ cv::Mat Image::drawLabels_() const
          {
             if (size_t prevSize{ colours.size() }; colours.size() <= currentLabel)
             {
-               colours.resize(currentLabel + 1);
+               colours.resize(currentLabel + 1LL);
                for (; prevSize < colours.size(); ++prevSize)
                {
                   colours[prevSize] = {
@@ -512,15 +513,4 @@ void Image::equaliseHSV_()
    cv::equalizeHist(channels[static_cast<int>(HSV::v)], channels[static_cast<int>(HSV::v)]);
 
    cv::merge(channels, mat_);
-}
-
-cv::Mat prj::getTree(const cv::Mat& mat, Rect<int> tree, std::pair<float, float> scale)
-{
-   return mat(
-      cv::Range{
-         cvRound(tree.y / scale.second),
-         cvRound((tree.y + tree.h) / scale.second) },
-      cv::Range{
-         cvRound(tree.x / scale.first),
-         cvRound((tree.x + tree.w) / scale.first) });
 }

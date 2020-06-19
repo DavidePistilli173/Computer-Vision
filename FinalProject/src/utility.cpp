@@ -34,7 +34,7 @@ double BOWExtractor::computeDist(const cv::Mat& img)
    return -1.0;
 }
 
-bool BOWExtractor::initExtractor(cv::Ptr<cv::xfeatures2d::SIFT> sift, cv::Ptr<cv::BFMatcher> matcher)
+bool BOWExtractor::initExtractor(const cv::Ptr<cv::xfeatures2d::SIFT>& sift, const cv::Ptr<cv::BFMatcher>& matcher)
 {
    if (sift == nullptr || matcher == nullptr) return false;
    sift_ = sift;
@@ -49,4 +49,15 @@ bool BOWExtractor::setData(const cv::Mat& hist, const cv::Mat& vocab)
    refHist_ = hist.clone();
    vocab_ = vocab.clone();
    if (extractor_ != nullptr) extractor_->setVocabulary(vocab_);
+}
+
+cv::Mat prj::getTree(const cv::Mat& mat, Rect<int> tree, std::pair<float, float> scale)
+{
+   return mat(
+      cv::Range{
+         cvRound(tree.y / scale.second),
+         cvRound(static_cast<float>(tree.y + tree.h) / scale.second) },
+      cv::Range{
+         cvRound(tree.x / scale.first),
+         cvRound(static_cast<float>(tree.x + tree.w) / scale.first) });
 }

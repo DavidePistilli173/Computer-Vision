@@ -35,10 +35,14 @@ namespace prj
       };
 
       /********** CONSTANTS **********/
+      // Connevtivity
+      static constexpr int neighbours{ 8 };
       // Thickness of a line wrt the smallest image dimension.
-      static constexpr float thickness_coeff{ 0.003F };
+      static constexpr double thickness_coeff{ 0.003 };
       // Default drawing colour.
       static const cv::Scalar default_colour;
+      // Contrast kernel size.
+      static const cv::Size contrast_kernel_size;
 
       /********** CONSTRUCTORS **********/
       Image() = default;
@@ -50,12 +54,12 @@ namespace prj
 
       /********** OPERATORS **********/
       Image& operator=(const Image& img);
-      Image& operator=(Image&&) = default;
+      Image& operator=(Image&&) noexcept = default;
       Image& operator=(const cv::Mat& mat);
 
       /********** METHODS **********/
       // Apply a bilateral filter to the image.
-      void bilateralFilter(int size, double colour_sig, double space_sig);
+      void bilateralFilter(const BilateralFilterParams& params);
       // Perform blob detection on the image.
       void blobDetection(const cv::SimpleBlobDetector::Params& params);
       // Apply the Canny edge detector.
@@ -67,11 +71,11 @@ namespace prj
       // Change the data type used for each channel.
       void convert(int type);
       // Draw a shape onto the image.
-      void draw(Shape shape, const std::vector<cv::Point>& pts, cv::Scalar colour);
+      void draw(Shape shape, const std::vector<cv::Point>& pts, const cv::Scalar& colour);
       // Draw text on the image.
-      void drawText(std::string_view text, cv::Point pt, cv::Scalar colour);
+      void drawText(std::string_view text, const cv::Point& pt, const cv::Scalar& colour);
       // Dilate the image.
-      void dilate(cv::Mat kernel);
+      void dilate(const cv::Mat& kernel);
       // Display the image.
       void display(RegionType type = RegionType::none) const;
       // Display the image in a window with custom name.
@@ -81,11 +85,11 @@ namespace prj
       // Return true if there is no image stored.
       [[nodiscard]] bool empty() const;
       // Erode the image.
-      void erode(cv::Mat kernel);
+      void erode(const cv::Mat& kernel);
       // Equalise the histogram of the image.
       void equaliseHistogram();
       // Apply a Gaussian filter to the image.
-      void gaussianFilter(cv::Size size, double sigma);
+      void gaussianFilter(const GaussianFilterParams& params);
       // Get the current colour space of the image.
       [[nodiscard]] ColourSpace getColourSpace() const;
       // Get a rectangle for each segment of the image.
@@ -97,7 +101,7 @@ namespace prj
       // Apply the log transform to the image.
       void log();
       // Compute the mean value for each channel of the image.
-      cv::Scalar mean() const;
+      [[nodiscard]] cv::Scalar mean() const;
       // Compute the negative image.
       void negative();
       // Normalise the image values.
@@ -105,7 +109,7 @@ namespace prj
       // Resize the image.
       void resize(const cv::Size& newSize);
       // Segment the image.
-      void segment(double cannyTh1, double cannyTh2, double distTh);
+      void segment(const SegmentationParams& params);
       // Set the colour space of the image.
       void setColourSpace(ColourSpace newColSpace);
       // Apply a threshold the image values.

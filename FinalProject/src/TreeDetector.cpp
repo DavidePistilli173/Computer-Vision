@@ -8,8 +8,11 @@
 
 using namespace prj;
 
-const cv::Size   TreeDetector::analysis_res{ img_width, img_height };
-const cv::Scalar TreeDetector::tree_colour{ 0, 0, 255 };
+const cv::Size             TreeDetector::analysis_res{ img_width, img_height };
+const cv::Scalar           TreeDetector::tree_colour{ 0, 0, 255 };
+const GaussianFilterParams TreeDetector::gauss_filt_params{
+   cv::Size{ 9, 9 }, 3.5
+};
 
 TreeDetector::TreeDetector(std::string_view bowFile)
 {
@@ -178,8 +181,8 @@ double prj::TreeDetector::computeScore_(double treeDist, double nonTreeDist)
 {
    if (treeDist < 0)
       return treeDist;
-   else
-      return nonTreeDist - treeDist;
+
+   return nonTreeDist - treeDist;
 }
 
 bool TreeDetector::drawResult_()
@@ -189,8 +192,8 @@ bool TreeDetector::drawResult_()
    {
       cv::Point pt1{ cvRound(tree.x * scale_.first), cvRound(tree.y * scale_.second) };
       cv::Point pt2{
-         cvRound((tree.x + tree.w) * scale_.first),
-         cvRound((tree.y + tree.h) * scale_.second)
+         cvRound(static_cast<float>(tree.x + tree.w) * scale_.first),
+         cvRound(static_cast<float>(tree.y + tree.h) * scale_.second)
       };
       result_.draw(
          Image::Shape::rect,
@@ -347,10 +350,10 @@ bool TreeDetector::preProcess_()
 {
    Log::info("Filtering image.");
    Image processedImage{ resizedInput_ };
-   processedImage.bilateralFilter(9, 150, 50);
-   processedImage.gaussianFilter(cv::Size{ 9, 9 }, 3.5);
+   processedImage.bilateralFilter(bi_filt_params);
+   processedImage.gaussianFilter(gauss_filt_params);
    Log::info("Segmenting image.");
-   processedImage.segment(50, 45, 0.415);
+   processedImage.segment(seg_params);
 
    if constexpr (debug) processedImage.display(Image::RegionType::label);
 

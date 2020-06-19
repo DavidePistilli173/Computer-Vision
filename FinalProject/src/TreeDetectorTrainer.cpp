@@ -67,7 +67,7 @@ void TreeDetectorTrainer::buildHistogram_(std::string_view folder)
 
    std::vector<std::thread> threads;
    threads.reserve(num_threads);
-   for (int i = 0; i < num_threads; ++i)
+   for (size_t i = 0; i < num_threads; ++i)
    {
       threads.emplace_back(
          std::thread([this, folder, &treeCount, &nonTreeCount]() {
@@ -130,7 +130,7 @@ bool TreeDetectorTrainer::compute_(std::string_view folder)
 
    std::vector<std::thread> threads;
    threads.reserve(num_threads);
-   for (int i = 0; i < num_threads; ++i)
+   for (size_t i = 0; i < num_threads; ++i)
    {
       threads.emplace_back(
          std::thread([this, folder, &treeCount, &nonTreeCount]() {
@@ -306,6 +306,8 @@ bool TreeDetectorTrainer::parse_(std::string_view cfgFile)
          trainingData_[i].trees.emplace_back(tree);
       }
    }
+
+   return true;
 }
 
 bool TreeDetectorTrainer::save_(std::string_view file)
@@ -337,7 +339,7 @@ bool prj::TreeDetectorTrainer::updateHistogram_(
    cv::Mat mat{ getTree(img.image(), rect, scalingFactor) };
    sift->detect(mat, keypoints);
 
-   if (keypoints.size() >= min_features)
+   if (keypoints.size() >= min_train_features)
    {
       cv::Mat                       descriptor;
       std::vector<std::vector<int>> currentHistogram;

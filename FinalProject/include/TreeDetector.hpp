@@ -18,13 +18,17 @@ namespace prj
       static constexpr double score_th{ 0.5 }; // Score threshold for histogram comparison.
       static const cv::Size   analysis_res;    // Resolution used to analyse the image.
       static const cv::Scalar tree_colour;     // Colour of the tree box.
+      // Pre-processing parameters.
+      static constexpr BilateralFilterParams bi_filt_params{ 9, 150.0, 50.0 }; // Bilateral filter
+      static const GaussianFilterParams      gauss_filt_params;                // Gaussian filter.
+      static constexpr SegmentationParams    seg_params{ 50.0, 45.0, 0.415 };  // Watershed segmentation.
       // Growth parameters.
       static constexpr int cell_w{ 200 };
       static constexpr int cell_h{ 200 };
       // Score thresholds for confirmed trees.
       static constexpr double base_threshold{ 0.025 };
       static constexpr double growth_th{ 0.85 };
-      static constexpr float  overlap_th{ 0.3 };
+      static constexpr float  overlap_th{ 0.3F };
 
       /********** CONSTRUCTOR **********/
       TreeDetector() = default;
@@ -39,7 +43,7 @@ namespace prj
       // Analyse the preprocessed data to find trees.
       bool analyse_();
       // Compute the score of an image from the class distances.
-      double computeScore_(double treeDist, double nonTreeDist);
+      static double computeScore_(double treeDist, double nonTreeDist);
       // Draw the final result.
       bool drawResult_();
       // Extend a cell in a given direction and compute its score.

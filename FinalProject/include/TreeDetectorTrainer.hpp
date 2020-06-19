@@ -33,6 +33,8 @@ namespace prj
       static constexpr std::string_view output_file{ "trees.xml" };
       // Size required to normalise all images.
       static const cv::Size img_size;
+      // Minimum number of features for training.
+      static constexpr int min_train_features{ 128 };
       // Image pyramid constants for non-tree analysis.
       static constexpr int pyr_depth{ 2 };
       static constexpr int pyr_children{ 4 };
@@ -71,7 +73,7 @@ namespace prj
       // Save the current training output.
       bool save_(std::string_view file);
       // Update one of the average histograms.
-      bool updateHistogram_(
+      static bool updateHistogram_(
          Histogram&                     hist,
          cv::Ptr<cv::xfeatures2d::SIFT> sift,
          cv::BOWImgDescriptorExtractor& bowExtractor,

@@ -58,12 +58,12 @@ int main(int argc, char* argv[])
       // Initialise the tree detector.
       Log::info("Initialising the tree detector.");
 
-      prj::TreeDetector td;
+      std::unique_ptr<prj::TreeDetector> td;
       try
       {
-         td = prj::TreeDetector(argv[static_cast<int>(Arg::file)]);
+         td = std::make_unique<prj::TreeDetector>(argv[static_cast<int>(Arg::file)]);
       }
-      catch (std::exception)
+      catch (std::exception&)
       {
          Log::fatal("Failed to initialise tree detector.");
          return 1;
@@ -71,7 +71,7 @@ int main(int argc, char* argv[])
 
       // Run the tree detector.
       Log::info("Detecting trees.");
-      cv::Mat result{ td.detect(img) };
+      cv::Mat result{ td->detect(img) };
       if (result.empty())
       {
          Log::fatal("Failed to detect trees.");

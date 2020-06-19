@@ -165,8 +165,8 @@ namespace prj
          T minArea{ std::min(thisArea, otherArea) };
          if (overlapArea >= ratio * minArea)
             return Rect<T>(orderedX[0], orderedY[0], orderedX[3] - orderedX[0], orderedY[3] - orderedY[0]);
-         else
-            return Rect<T>(0, 0, 0, 0);
+
+         return Rect<T>(0, 0, 0, 0);
       }
 
       // Position of the top-left vertex.

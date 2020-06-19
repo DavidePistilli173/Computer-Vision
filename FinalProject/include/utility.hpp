@@ -62,6 +62,30 @@ namespace prj
    };
 
    /********** STRUCTS **********/
+   // Parameters for the bilateral filter.
+   struct BilateralFilterParams
+   {
+      int    size{};
+      double colSig{};
+      double spaceSig{};
+   };
+
+   // Parameters for the Gaussian filter.
+   struct GaussianFilterParams
+   {
+      cv::Size size{};
+      double   sigma{};
+   };
+
+   // Parameters for the segmentation.
+   struct SegmentationParams
+   {
+      double cannyTh1{};
+      double cannyTh2{};
+      double distTh{};
+   };
+
+   // Position, size and score of a tree.
    struct Tree
    {
       constexpr Tree() = default;
@@ -99,8 +123,8 @@ namespace prj
 
       if (x / mid < mid)
          return sqrt_helper<T>(x, lo, mid - 1);
-      else
-         return sqrt_helper(x, mid, hi);
+
+      return sqrt_helper(x, mid, hi);
    }
 
    template<typename T>
@@ -118,7 +142,7 @@ namespace prj
       // Compute the distance between img and the reference histogram.
       double computeDist(const cv::Mat& img);
       // Initialise the BOW extractor.
-      bool initExtractor(cv::Ptr<cv::xfeatures2d::SIFT> sift, cv::Ptr<cv::BFMatcher> matcher);
+      bool initExtractor(const cv::Ptr<cv::xfeatures2d::SIFT>& sift, const cv::Ptr<cv::BFMatcher>& matcher);
       // Set the data to work on.
       bool setData(const cv::Mat& hist, const cv::Mat& vocab);
 
@@ -167,12 +191,12 @@ namespace prj
       }
 
       /********** METHODS **********/
-      int minCellHeight() const
+      [[nodiscard]] int minCellHeight() const
       {
          return minCellHeight_;
       }
 
-      int minCellWidth() const
+      [[nodiscard]] int minCellWidth() const
       {
          return minCellWidth_;
       }
