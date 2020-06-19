@@ -33,7 +33,11 @@ add_executable(
     "src/prj_main.cpp"
     "src/utility.cpp"
     "src/TreeDetector.cpp"
-    "src/TreeDetectorTrainer.cpp")
+    "src/TreeDetectorTrainer.cpp" 
+    "src/Image.cpp" 
+    "src/Window.cpp" 
+    "src/Log.cpp"
+)
 
 # If on Unix, link to Pthread as well.
 if (WIN32)

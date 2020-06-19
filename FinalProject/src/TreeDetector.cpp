@@ -1,5 +1,7 @@
 #include "TreeDetector.hpp"
 
+#include "Log.hpp"
+
 #include <opencv2/imgproc.hpp>
 #include <opencv2/xfeatures2d.hpp>
 #include <thread>
@@ -257,9 +259,6 @@ void TreeDetector::growCandidates_()
 
    auto sift = cv::xfeatures2d::SIFT::create(max_features);
 
-   int cellW{ pyramid_.minCellWidth() };
-   int cellH{ pyramid_.minCellHeight() };
-
    int rightLimit{ resizedInput_.image().cols - 1 };
    int bottomLimit{ resizedInput_.image().rows - 1 };
 
@@ -279,10 +278,10 @@ void TreeDetector::growCandidates_()
          };
 
          std::array extensions{
-            preliminaryTrees_[i].rect.getExtension(Side::right, cellW, rightLimit),
-            preliminaryTrees_[i].rect.getExtension(Side::top, cellH, 0),
-            preliminaryTrees_[i].rect.getExtension(Side::left, cellH, 0),
-            preliminaryTrees_[i].rect.getExtension(Side::bottom, cellW, bottomLimit)
+            preliminaryTrees_[i].rect.getExtension(Side::right, cell_w, rightLimit),
+            preliminaryTrees_[i].rect.getExtension(Side::top, cell_h, 0),
+            preliminaryTrees_[i].rect.getExtension(Side::left, cell_h, 0),
+            preliminaryTrees_[i].rect.getExtension(Side::bottom, cell_w, bottomLimit)
          };
 
          auto hasFeatures = [this, &sift](const Rect<int>& rect) {
@@ -295,7 +294,7 @@ void TreeDetector::growCandidates_()
          if (hasFeatures(extensions[static_cast<int>(Side::right)]))
          {
             newTrees[static_cast<int>(Side::right)].score =
-               extendCell_(newTrees[static_cast<int>(Side::right)].rect, Side::right, cellW, rightLimit);
+               extendCell_(newTrees[static_cast<int>(Side::right)].rect, Side::right, cell_w, rightLimit);
          }
          else
             newTrees[static_cast<int>(Side::right)].score = -1.0;
@@ -303,7 +302,7 @@ void TreeDetector::growCandidates_()
          if (hasFeatures(extensions[static_cast<int>(Side::top)]))
          {
             newTrees[static_cast<int>(Side::top)].score =
-               extendCell_(newTrees[static_cast<int>(Side::top)].rect, Side::top, cellH, 0);
+               extendCell_(newTrees[static_cast<int>(Side::top)].rect, Side::top, cell_h, 0);
          }
          else
             newTrees[static_cast<int>(Side::top)].score = -1.0;
@@ -311,7 +310,7 @@ void TreeDetector::growCandidates_()
          if (hasFeatures(extensions[static_cast<int>(Side::left)]))
          {
             newTrees[static_cast<int>(Side::left)].score =
-               extendCell_(newTrees[static_cast<int>(Side::left)].rect, Side::left, cellW, 0);
+               extendCell_(newTrees[static_cast<int>(Side::left)].rect, Side::left, cell_w, 0);
          }
          else
             newTrees[static_cast<int>(Side::left)].score = -1.0;
@@ -319,7 +318,7 @@ void TreeDetector::growCandidates_()
          if (hasFeatures(extensions[static_cast<int>(Side::bottom)]))
          {
             newTrees[static_cast<int>(Side::bottom)].score =
-               extendCell_(newTrees[static_cast<int>(Side::bottom)].rect, Side::bottom, cellH, bottomLimit);
+               extendCell_(newTrees[static_cast<int>(Side::bottom)].rect, Side::bottom, cell_h, bottomLimit);
          }
          else
             newTrees[static_cast<int>(Side::bottom)].score = -1.0;
@@ -359,23 +358,4 @@ bool TreeDetector::preProcess_()
    segments_ = processedImage.getRegions(Image::RegionType::label);
 
    return true;
-}
-
-void TreeDetector::addCandidateTrees_(ImagePyramid<pyr_children, pyr_depth>::Cell* node)
-{
-   if (node == nullptr) return;
-
-   if (node->status == Cell::Status::tree)
-   {
-      preliminaryTrees_.emplace_back(Tree(node->rect, node->score));
-      return;
-   }
-
-   for (const auto& row : node->children)
-   {
-      for (const auto& child : row)
-      {
-         addCandidateTrees_(child.get());
-      }
-   }
 }

@@ -1,5 +1,8 @@
 #include "TreeDetectorTrainer.hpp"
 
+#include "Image.hpp"
+#include "Log.hpp"
+
 #include <algorithm>
 #include <fstream>
 #include <opencv2/imgproc.hpp>

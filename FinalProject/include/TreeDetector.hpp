@@ -1,6 +1,7 @@
 #ifndef TREEDETECTOR_HPP
 #define TREEDETECTOR_HPP
 
+#include "Image.hpp"
 #include "utility.hpp"
 
 #include <array>
@@ -14,19 +15,16 @@ namespace prj
    {
    public:
       /********** CONSTANTS **********/
-      static constexpr double score_th{ 0.5 };   // Score threshold for histogram comparison.
-      static const cv::Size   analysis_res;      // Resolution used to analyse the image.
-      static const cv::Scalar tree_colour;       // Colour of the tree box.
-      static constexpr int    pyr_children{ 4 }; // Number of children per cell.
-      static constexpr int    pyr_depth{ 4 };    // Depth of the analysis grid.
+      static constexpr double score_th{ 0.5 }; // Score threshold for histogram comparison.
+      static const cv::Size   analysis_res;    // Resolution used to analyse the image.
+      static const cv::Scalar tree_colour;     // Colour of the tree box.
+      // Growth parameters.
+      static constexpr int cell_w{ 200 };
+      static constexpr int cell_h{ 200 };
       // Score thresholds for confirmed trees.
-      static constexpr double base_threshold{ 0.04 };
-      static constexpr double child_th_coeff{ 0.04 };
-      static constexpr double growth_th{ 0.9 };
+      static constexpr double base_threshold{ 0.025 };
+      static constexpr double growth_th{ 0.85 };
       static constexpr float  overlap_th{ 0.3 };
-
-      /********** TYPE ALIASES **********/
-      using Cell = ImagePyramid<pyr_children, pyr_depth>::Cell;
 
       /********** CONSTRUCTOR **********/
       TreeDetector() = default;
@@ -38,8 +36,6 @@ namespace prj
 
    private:
       /********** METHODS **********/
-      // Add all candidate trees in the subtree that starts from node.
-      void addCandidateTrees_(Cell* node);
       // Analyse the preprocessed data to find trees.
       bool analyse_();
       // Compute the score of an image from the class distances.
@@ -60,15 +56,14 @@ namespace prj
       bool preProcess_();
 
       /********** VARIABLES **********/
-      BOWExtractor                          treeExtractor_;                    // Histogram extractor for trees.
-      BOWExtractor                          nonTreeExtractor_;                 // Histogram extractor for non-trees.
-      Image                                 resizedInput_;                     // Resized input image.
-      Image                                 result_;                           // Final result.
-      std::vector<Rect<int>>                segments_;                         // Segmentation result.
-      std::vector<Tree>                     preliminaryTrees_;                 // All regions containing trees.
-      std::vector<Rect<int>>                trees_;                            // Final trees in the image.
-      std::pair<float, float>               scale_{ 1.0F, 1.0F };              // Scaling factor of the image.
-      ImagePyramid<pyr_children, pyr_depth> pyramid_{ img_width, img_height }; // Analysis grid.
+      BOWExtractor            treeExtractor_;       // Histogram extractor for trees.
+      BOWExtractor            nonTreeExtractor_;    // Histogram extractor for non-trees.
+      Image                   resizedInput_;        // Resized input image.
+      Image                   result_;              // Final result.
+      std::vector<Rect<int>>  segments_;            // Segmentation result.
+      std::vector<Tree>       preliminaryTrees_;    // All regions containing trees.
+      std::vector<Rect<int>>  trees_;               // Final trees in the image.
+      std::pair<float, float> scale_{ 1.0F, 1.0F }; // Scaling factor of the image.
    };
 } // namespace prj
 

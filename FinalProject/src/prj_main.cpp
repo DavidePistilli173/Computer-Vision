@@ -1,5 +1,7 @@
+#include "Log.hpp"
 #include "TreeDetector.hpp"
 #include "TreeDetectorTrainer.hpp"
+#include "Window.hpp"
 #include "utility.hpp"
 
 #include <opencv2/imgproc.hpp>

@@ -1,6 +1,7 @@
 #ifndef TREEDETECTORTRAINER_HPP
 #define TREEDETECTORTRAINER_HPP
 
+#include "Image.hpp"
 #include "utility.hpp"
 
 #include <atomic>
