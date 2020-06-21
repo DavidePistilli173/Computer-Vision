@@ -1,6 +1,7 @@
 #ifndef RECT_HPP
 #define RECT_HPP
 
+#include <algorithm>
 #include <array>
 
 namespace prj

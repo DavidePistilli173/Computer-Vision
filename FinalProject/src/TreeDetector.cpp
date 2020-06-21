@@ -55,6 +55,7 @@ TreeDetector::TreeDetector(std::string_view bowFile)
    }
 
    // Initialise the tree extractor.
+   if (sift.empty() || matcher.empty()) Log::error("ABOFSABGFOASBGOASB");
    if (!treeExtractor_.initExtractor(sift, matcher))
    {
       Log::error("Failed to initialise the tree extractor.");
@@ -160,7 +161,7 @@ bool TreeDetector::analyse_()
    int i{ 0 };
    while (i > preliminaryTrees_.size())
    {
-      i = fuseTrees_(i);
+      i = fuseTrees_(i, true);
       ++i;
    }
 
@@ -174,13 +175,14 @@ bool TreeDetector::analyse_()
       trees_.emplace_back(tree.rect);
    }
 
+   //trees_ = segments_;
+
    return true;
 }
 
-double prj::TreeDetector::computeScore_(double treeDist, double nonTreeDist)
+double TreeDetector::computeScore_(double treeDist, double nonTreeDist)
 {
-   if (treeDist < 0)
-      return treeDist;
+   if (treeDist < 0) return treeDist;
 
    return nonTreeDist - treeDist;
 }
@@ -219,7 +221,7 @@ double prj::TreeDetector::extendCell_(
    return computeScore_(treeDist, nonTreeDist);
 }
 
-int TreeDetector::fuseTrees_(int ref)
+int TreeDetector::fuseTrees_(int ref, bool removeRef)
 {
    int j{ 0 };
    while (j < preliminaryTrees_.size())
@@ -228,6 +230,13 @@ int TreeDetector::fuseTrees_(int ref)
       {
          if (preliminaryTrees_[ref].rect.contains(preliminaryTrees_[j].rect))
          {
+            if (removeRef)
+            {
+               auto it = preliminaryTrees_.begin() + ref;
+               preliminaryTrees_.erase(it);
+               return ref;
+            }
+
             auto it = preliminaryTrees_.begin() + j;
             if (j < ref) --ref;
             preliminaryTrees_.erase(it);

@@ -41,6 +41,7 @@ bool BOWExtractor::initExtractor(const cv::Ptr<cv::xfeatures2d::SIFT>& sift, con
    extractor_ = std::make_unique<cv::BOWImgDescriptorExtractor>(
       cv::BOWImgDescriptorExtractor{ sift_, matcher });
    if (!vocab_.empty()) extractor_->setVocabulary(vocab_);
+   return true;
 }
 
 bool BOWExtractor::setData(const cv::Mat& hist, const cv::Mat& vocab)
@@ -49,6 +50,7 @@ bool BOWExtractor::setData(const cv::Mat& hist, const cv::Mat& vocab)
    refHist_ = hist.clone();
    vocab_ = vocab.clone();
    if (extractor_ != nullptr) extractor_->setVocabulary(vocab_);
+   return true;
 }
 
 cv::Mat prj::getTree(const cv::Mat& mat, Rect<int> tree, std::pair<float, float> scale)

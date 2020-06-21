@@ -26,8 +26,8 @@ namespace prj
       static constexpr int cell_w{ 200 };
       static constexpr int cell_h{ 200 };
       // Score thresholds for confirmed trees.
-      static constexpr double base_threshold{ 0.025 };
-      static constexpr double growth_th{ 0.85 };
+      static constexpr double base_threshold{ 0.04 };
+      static constexpr double growth_th{ 0.90 };
       static constexpr float  overlap_th{ 0.3F };
 
       /********** CONSTRUCTOR **********/
@@ -53,7 +53,7 @@ namespace prj
          int             amount,
          int             limit);
       // Combine trees that overlap.
-      int fuseTrees_(int ref);
+      int fuseTrees_(int ref, bool removeRef = false);
       // Grow each candidate tree while it improves its score.
       void growCandidates_();
       // Preprocess the input image.

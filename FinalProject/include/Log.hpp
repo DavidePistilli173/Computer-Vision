@@ -1,7 +1,10 @@
 #ifndef LOG_HPP
 #define LOG_HPP
 
+#include "utility.hpp"
+
 #include <mutex>
+#include <sstream>
 #include <string_view>
 #include <thread>
 

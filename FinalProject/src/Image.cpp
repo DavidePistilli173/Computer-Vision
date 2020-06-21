@@ -399,7 +399,7 @@ std::vector<Rect<int>> prj::Image::computeLabelRegions_() const
 
    std::vector<int> ids;
    // Cumulative region parameters used to compute average centre and size.
-   std::vector<std::pair<cv::Point2l, long>> cumulatives;
+   std::vector<std::pair<cv::Point2l, int>> cumulatives;
 
    // Compute the region centres.
    for (int y = 0; y < labels_.rows; ++y)
@@ -456,8 +456,13 @@ std::vector<Rect<int>> prj::Image::computeLabelRegions_() const
    // Compute the average sizes.
    for (int i = 0; i < cumulatives.size(); ++i)
    {
-      result[i].w = 2 * cumulatives[i].first.x / cumulatives[i].second;
-      result[i].h = 2 * cumulatives[i].first.y / cumulatives[i].second;
+      result[i].w = 3 * 2 * cumulatives[i].first.x / cumulatives[i].second;
+      result[i].h = 3 * 2 * cumulatives[i].first.y / cumulatives[i].second;
+      result[i].x -= result[i].w / 2;
+      result[i].y -= result[i].h / 2;
+
+      if (result[i].x < 0) result[i].x = 0;
+      if (result[i].y < 0) result[i].y = 0;
       int xDiff{ result[i].x + result[i].w - mat_.cols + 1 };
       int yDiff{ result[i].y + result[i].h - mat_.rows + 1 };
       if (xDiff > 0) result[i].w -= xDiff;

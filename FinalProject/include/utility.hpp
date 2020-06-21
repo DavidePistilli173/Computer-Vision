@@ -28,7 +28,7 @@ namespace prj
    constexpr std::string_view xml_nontree_hist{ "NonTree" };
    // Maximum of features for each tree.
    constexpr int max_features{ 2048 };
-   constexpr int min_features{ 256 };
+   constexpr int min_features{ 128 };
    // Number of words in a vocabulary.
    constexpr int num_words{ 128 };
    // Image dimensions.
@@ -154,7 +154,7 @@ namespace prj
       std::unique_ptr<cv::BOWImgDescriptorExtractor> extractor_;
    };
 
-   // Quad-tree used to segment an image.
+   // N-ary tree used to segment an image.
    template<int Children, int Depth>
    class ImagePyramid
    {
