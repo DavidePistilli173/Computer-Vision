@@ -159,10 +159,21 @@ bool TreeDetector::analyse_()
       });
    // Combine overlapping candidates.
    int i{ 0 };
-   while (i > preliminaryTrees_.size())
+   while (i < preliminaryTrees_.size())
    {
       i = fuseTrees_(i, true);
       ++i;
+   }
+
+   if constexpr (debug)
+   {
+      for (const auto& candidate : preliminaryTrees_)
+      {
+         trees_.emplace_back(candidate.rect);
+      }
+      drawResult_();
+      result_.display();
+      trees_.clear();
    }
 
    // Compute the final trees.
@@ -230,7 +241,7 @@ int TreeDetector::fuseTrees_(int ref, bool removeRef)
       {
          if (preliminaryTrees_[ref].rect.contains(preliminaryTrees_[j].rect))
          {
-            if (removeRef)
+            if (removeRef && preliminaryTrees_[j].score > growth_th * preliminaryTrees_[ref].score)
             {
                auto it = preliminaryTrees_.begin() + ref;
                preliminaryTrees_.erase(it);
